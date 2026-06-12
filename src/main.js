@@ -8,12 +8,13 @@ import HUDScene from './scenes/HUDScene.js';
 import PauseScene from './scenes/PauseScene.js';
 import GameOverScene from './scenes/GameOverScene.js';
 import EndScene from './scenes/EndScene.js';
-import { setupTouchControls } from './input/TouchControls.js';
+import { setupTouchControls, setupControlsSwap } from './input/TouchControls.js';
 
 // Show/wire the on-screen buttons before the game boots, so the
 // layout (game on top, controls below) is settled when Phaser measures
 // its parent container.
 setupTouchControls();
+setupControlsSwap();
 
 // On phones in portrait the screen is narrow — a 800px-wide view ends up
 // tiny. We narrow the LOGICAL view instead (540px ≈ 30 tiles of lookahead,

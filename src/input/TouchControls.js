@@ -13,6 +13,41 @@ export function isTouchDevice() {
   return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 }
 
+// Remembers the player's preferred side for the controls. When swapped,
+// the action buttons move to the left and the d-pad to the right.
+const SWAP_STORAGE_KEY = 'astrohop.controlsSwapped';
+
+function isSwapped() {
+  try {
+    return localStorage.getItem(SWAP_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function applySwap(swapped) {
+  document.getElementById('touch-controls')?.classList.toggle('swapped', swapped);
+}
+
+/**
+ * Wires the "Swap controls" button so players can flip the d-pad and the
+ * action buttons between sides. The choice is saved to localStorage and
+ * re-applied on the next load.
+ */
+export function setupControlsSwap() {
+  applySwap(isSwapped());
+
+  document.getElementById('swap-controls')?.addEventListener('click', () => {
+    const swapped = !isSwapped();
+    applySwap(swapped);
+    try {
+      localStorage.setItem(SWAP_STORAGE_KEY, swapped ? '1' : '0');
+    } catch {
+      /* storage unavailable (private mode) — the swap still applies for the session */
+    }
+  });
+}
+
 /**
  * Pointer handling done properly for a virtual gamepad:
  *
