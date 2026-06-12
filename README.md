@@ -5,7 +5,7 @@ Nintendo IP), built as a learning project with **Phaser 3** and **Vite**.
 Runs on desktop **and** mobile from the same URL: keyboard on desktop, a
 Game Boy Advance-style touch layout on phones.
 
-**▶ Play it live:** https://nunoamorim99.github.io/2DPlatformGame/
+**▶ Play it live:** https://nunoamorim99.github.io/AstroHop/
 
 <!-- TODO: screenshot/GIF here, e.g.: ![gameplay](docs/screenshot.png) -->
 
