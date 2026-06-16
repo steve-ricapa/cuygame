@@ -1,9 +1,8 @@
 # Astro Hop 👾
 
-A Mario-style retro 2D platformer (original characters and assets — not
-Nintendo IP), built as a learning project with **Phaser 3** and **Vite**.
-Runs on desktop **and** mobile from the same URL: keyboard on desktop, a
-Game Boy Advance-style touch layout on phones.
+Astro Hop is a retro, Mario-style 2D platformer built with Phaser 3 and Vite (vanilla JS), playable on desktop and mobile from the same URL and deployed to GitHub Pages.
+The project has two goals running in parallel. The first is hands-on game development — physics and game feel, sprite animation, tilemap level design, power-up state machines, mobile touch controls, and a full game-flow loop. The second is using the build as a way to understand the Claude Fable 5 model: how far it can be pushed as a coding partner, where it excels, and where it needs steering, across everything from architecture decisions to spritesheet analysis and asset generation.
+Built with original assets (not Nintendo IP), starting from Kenney.nl's CC0 pixel-art packs.
 
 **▶ Play it live:** https://nunoamorim99.github.io/AstroHop/
 
