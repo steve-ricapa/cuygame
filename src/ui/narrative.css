@@ -1,0 +1,614 @@
+/* ==========================================================================
+   Capa narrativa (HTML/CSS) — fotos, álbum, carta, vale y celebración.
+   Se superpone al canvas de Phaser y vive en el documento, así que los textos
+   largos son legibles, hay botones reales y accesibilidad de foco.
+   ========================================================================== */
+
+:root {
+  --cuy-cream: #fff4dd;
+  --cuy-outline: #54372d;
+  --cuy-caramel: #c68b59;
+  --cuy-pink: #eaa6bc;
+  --cuy-sage: #9cbf9b;
+  --cuy-lavender: #9b86c8;
+  --cuy-night: #252542;
+  --cuy-gold: #eac56a;
+  --narrative-radius: 20px;
+}
+
+#narrative-root {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #3a2a22;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#narrative-root.open {
+  display: flex;
+}
+
+.narrative-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(30, 22, 34, 0.72);
+  backdrop-filter: blur(3px);
+  animation: narr-fade 0.25s ease;
+}
+
+.narrative-panel {
+  position: relative;
+  z-index: 1;
+  width: min(560px, 94vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: var(--cuy-cream);
+  border: 3px solid var(--cuy-outline);
+  border-radius: var(--narrative-radius);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  padding: 18px 18px 20px;
+  animation: narr-pop 0.28s cubic-bezier(0.2, 1.3, 0.5, 1);
+}
+
+.narrative-panel.wide {
+  width: min(760px, 96vw);
+}
+
+.narrative-title {
+  font-size: 1.45rem;
+  font-weight: 800;
+  text-align: center;
+  color: var(--cuy-outline);
+  margin: 2px 0 12px;
+  line-height: 1.2;
+}
+
+.narrative-sub {
+  text-align: center;
+  color: #6b5245;
+  font-size: 0.95rem;
+  margin: -6px 0 12px;
+}
+
+/* Emoji decorativo grande (recuerdos sorpresa). */
+.narrative-emoji {
+  text-align: center;
+  font-size: 3rem;
+  line-height: 1;
+  margin: 0 0 6px;
+  filter: drop-shadow(0 3px 5px rgba(74, 56, 46, 0.25));
+}
+
+.narrative-message {
+  font-size: 1.02rem;
+  line-height: 1.55;
+  color: #4a382e;
+  text-align: center;
+  margin: 0 4px 16px;
+}
+
+/* ---- Foto ---- */
+.narrative-photo-frame {
+  position: relative;
+  width: 100%;
+  background: #efe3cc;
+  border: 2px solid var(--cuy-outline);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+}
+
+.narrative-photo-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 58vh;
+  object-fit: contain;
+  background: #efe3cc;
+  transition: transform 0.25s ease;
+}
+
+.narrative-photo-frame.zoomed img {
+  max-height: none;
+  width: 100%;
+}
+
+.narrative-photo-loading,
+.narrative-photo-error {
+  padding: 34px 18px;
+  text-align: center;
+  font-size: 0.95rem;
+  color: #7a5f4f;
+}
+
+.narrative-photo-error {
+  color: #9c2f38;
+  padding: 12px 18px 0;
+}
+
+/* Marcador cuando falta la foto real (desarrollo / archivo ausente). */
+.narrative-photo-frame.placeholder {
+  border-style: dashed;
+  background: repeating-linear-gradient(
+    45deg,
+    #f3ead6,
+    #f3ead6 12px,
+    #ece0c6 12px,
+    #ece0c6 24px
+  );
+}
+
+.narrative-photo-placeholder {
+  padding: 30px 18px;
+  text-align: center;
+  color: #7a5f4f;
+}
+
+.narrative-photo-placeholder-icon {
+  font-size: 2.6rem;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.narrative-photo-placeholder p {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ---- Botones ---- */
+.narrative-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.narrative-btn {
+  appearance: none;
+  border: 2px solid var(--cuy-outline);
+  border-radius: 14px;
+  background: var(--cuy-pink);
+  color: #3a1f27;
+  font: inherit;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 12px 20px;
+  min-height: 48px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(84, 55, 45, 0.5);
+  transition: transform 0.08s ease, filter 0.15s ease;
+}
+
+.narrative-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 rgba(84, 55, 45, 0.5);
+}
+
+.narrative-btn.primary {
+  background: var(--cuy-gold);
+}
+
+.narrative-btn.ghost {
+  background: transparent;
+  color: var(--cuy-outline);
+  box-shadow: none;
+  border-style: dashed;
+}
+
+.narrative-btn:disabled {
+  filter: grayscale(0.6) opacity(0.6);
+  cursor: default;
+  transform: none;
+}
+
+.narrative-btn:focus-visible,
+.narrative-input:focus-visible {
+  outline: 3px solid #3b6ea5;
+  outline-offset: 2px;
+}
+
+/* ---- Álbum ---- */
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.album-card {
+  border: 2px solid var(--cuy-outline);
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+  cursor: pointer;
+  padding: 0;
+  text-align: center;
+  font: inherit;
+  color: inherit;
+}
+
+.album-card img {
+  display: block;
+  width: 100%;
+  height: 96px;
+  object-fit: cover;
+}
+
+.album-card .album-label {
+  padding: 8px 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--cuy-outline);
+}
+
+.album-card.locked {
+  cursor: default;
+  background: #e6d9c2;
+  border-style: dashed;
+}
+
+.album-card .album-emoji {
+  font-size: 1.8rem;
+  padding: 22px 0 6px;
+  color: #b7a488;
+}
+
+.album-extra {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ---- Carta ---- */
+.letter-envelope {
+  text-align: center;
+  padding: 10px 0 4px;
+}
+
+.letter-envelope .envelope-art {
+  font-size: 4rem;
+  line-height: 1;
+}
+
+.letter-body {
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: #42332b;
+  text-align: left;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 6px 2px 14px;
+  max-height: 62vh;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.letter-body p {
+  margin: 0 0 1em;
+}
+
+/* ---- Vale ---- */
+.voucher {
+  border: 3px dashed var(--cuy-gold);
+  border-radius: 16px;
+  padding: 16px;
+  background: #fffdf6;
+  text-align: center;
+}
+
+.voucher h3 {
+  font-size: 1.2rem;
+  letter-spacing: 0.08em;
+  color: var(--cuy-outline);
+  margin-bottom: 10px;
+}
+
+.voucher .voucher-lines {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #4a382e;
+  white-space: pre-line;
+  margin-bottom: 14px;
+}
+
+.voucher-options {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.voucher-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 2px solid var(--cuy-outline);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  min-height: 48px;
+}
+
+.voucher-option.selected {
+  border-color: var(--cuy-lavender);
+  background: #f3effa;
+  box-shadow: 0 0 0 3px rgba(155, 134, 200, 0.25);
+}
+
+.voucher-option .voucher-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--cuy-outline);
+  flex: 0 0 auto;
+}
+
+.voucher-option .voucher-detail {
+  display: block;
+  font-size: 0.82rem;
+  color: #6b5245;
+  margin-top: 2px;
+}
+
+.voucher-saved {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #eef6ed;
+  color: #3b5c3a;
+  font-size: 0.92rem;
+}
+
+/* ---- Regalo final: elección + vale generado ---- */
+.gift-stage {
+  text-align: center;
+}
+
+.gift-message {
+  white-space: pre-line;
+  text-align: center;
+}
+
+.gift-options {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 10px;
+  text-align: left;
+}
+
+@media (min-width: 620px) {
+  .gift-options {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.gift-option {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 2px solid var(--cuy-outline);
+  border-radius: 16px;
+  background: #fff;
+  padding: 14px 42px 14px 14px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  min-height: 68px;
+  transition: transform 0.08s ease, box-shadow 0.15s ease, border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.gift-option:hover {
+  transform: translateY(-1px);
+}
+
+.gift-option[aria-pressed='true'] {
+  border-color: var(--cuy-pink);
+  background: #fff4f8;
+  box-shadow: 0 0 0 3px rgba(234, 166, 188, 0.35);
+}
+
+.gift-option .gift-icon {
+  font-size: 1.9rem;
+  line-height: 1.1;
+  flex: 0 0 auto;
+}
+
+.gift-option .gift-label {
+  display: block;
+  font-weight: 800;
+  color: var(--cuy-outline);
+  font-size: 1.02rem;
+}
+
+.gift-option .gift-detail {
+  display: block;
+  font-size: 0.85rem;
+  color: #6b5245;
+  margin-top: 4px;
+  line-height: 1.35;
+}
+
+.gift-option .gift-check {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--cuy-outline);
+  background: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: transparent;
+}
+
+.gift-option[aria-pressed='true'] .gift-check {
+  background: var(--cuy-pink);
+  border-color: var(--cuy-pink);
+  color: #fff;
+}
+
+.gift-note {
+  font-style: italic;
+  color: #6b5245;
+  font-size: 0.95rem;
+  text-align: center;
+  margin: 6px 4px 4px;
+}
+
+.gift-building {
+  padding: 48px 0;
+  text-align: center;
+  color: #8a6f5f;
+}
+
+.gift-preview {
+  margin: 14px auto;
+  max-width: 560px;
+  max-height: 56vh;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #f3e6d2;
+  border-radius: 16px;
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+}
+
+.gift-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  border-radius: 12px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25);
+}
+
+.gift-actions {
+  margin-top: 8px;
+}
+
+/* ---- Vela / torta ---- */
+.cake-stage {
+  text-align: center;
+  padding: 8px 0 4px;
+}
+
+.cake-art {
+  font-size: 3.4rem;
+  line-height: 1.1;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease, filter 0.2s ease;
+}
+
+.cake-art.lit {
+  filter: drop-shadow(0 0 14px rgba(234, 197, 106, 0.9));
+}
+
+.cake-art.out {
+  filter: grayscale(0.4) brightness(0.85);
+}
+
+/* ---- Celebración ---- */
+.celebration {
+  text-align: center;
+}
+
+.celebration .big {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--cuy-outline);
+  margin: 4px 0 10px;
+}
+
+.confetti-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+}
+
+/* ---- Toast ---- */
+.narrative-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  background: var(--cuy-night);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  z-index: 70;
+  max-width: 90vw;
+  text-align: center;
+  animation: narr-fade 0.2s ease;
+}
+
+.narrative-emblems {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin: 10px 0 4px;
+  font-size: 1.6rem;
+}
+
+.narrative-emblems .dim {
+  opacity: 0.28;
+  filter: grayscale(1);
+}
+
+@keyframes narr-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes narr-pop {
+  from { opacity: 0; transform: scale(0.92) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ---- Movimiento reducido ---- */
+@media (prefers-reduced-motion: reduce) {
+  .narrative-scrim,
+  .narrative-panel {
+    animation: none;
+  }
+  .narrative-btn,
+  .cake-art {
+    transition: none;
+  }
+}
+
+/* ---- Móvil ---- */
+@media (max-width: 430px) {
+  .narrative-panel {
+    padding: 14px 14px 16px;
+  }
+  .narrative-title {
+    font-size: 1.25rem;
+  }
+  .narrative-message {
+    font-size: 0.98rem;
+  }
+}

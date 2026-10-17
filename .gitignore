@@ -16,6 +16,19 @@ npm-debug.log*
 # Generated tool output (contact sheets, level screenshots, temp scripts)
 tools/_*
 
+# ---- Archivos personales (NUNCA se suben al repositorio) --------------------
+# Fotos, música comercial, la carta y la dedicatoria son privados.
+public/personal/fotos/*
+public/personal/musica/*
+public/personal/carta.txt
+public/personal/dedicatoria.mp3
+!public/personal/fotos/.gitkeep
+!public/personal/musica/.gitkeep
+
+# Bandeja local para packs comprados (p. ej. Guinea_Pigs_Asset.zip)
+asset-inbox/*
+!asset-inbox/.gitkeep
+
 # Editor / OS
 .vscode/*
 !.vscode/extensions.json

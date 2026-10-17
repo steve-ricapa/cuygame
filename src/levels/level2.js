@@ -1,58 +1,43 @@
 import { sparse, ground, gap } from './builder.js';
 
-// WORLD 1-2 — underground: cave ceiling, darker palette, more vertical
-// platforming. Full 25 rows (the ceiling needs the top of the world).
-
-const W = 200;
+// NIVEL 2 — La magia que tienes (plazuela al atardecer).
+// Algo más dinámico que el jardín pero de lectura clara: balcones bajos,
+// azoteas y farolitos. Cofre principal 'K' (col 128), cofre sorpresa 'J'
+// (col 168) y meta 'G' al final (col 200).
+const W = 208;
 
 export default {
-  name: 'WORLD 1-2',
-  theme: 'underground',
+  name: '2 · La magia que tienes',
+  title: 'La magia que tienes',
+  theme: 'dusk',
   next: 'level3',
+  memory: 'memory-present',
+  emblem: 'note',
   width: W,
   rows: [
-    // r0/r1 — cave ceiling
-    ground(W),
-    ground(W),
-    // r2 — stalactites + side walls
-    sparse(W, [0, ground(8)], [40, 'XX'], [80, 'XX'], [120, 'XX'], [192, ground(8)]),
-    sparse(W), // r3
-    sparse(W), // r4
-    sparse(W), // r5
-    sparse(W), // r6
-    sparse(W), // r7
-    sparse(W), // r8
-    sparse(W), // r9
-    // r10 — coins over the upper gallery
-    sparse(W, [40, 'ccccc']),
-    // r11 — gallery enemy; coins over the final climb
-    sparse(W, [42, 'e'], [147, 'ccc']),
-    // r12 — long upper gallery + coins over the entry climb
-    sparse(W, [29, 'ccc'], [36, 'PPPPPPPPPPPPP']),
-    // r13 — final climb top platform
-    sparse(W, [146, 'PPPPP']),
-    // r14 — entry climb top; coins; upper bricks; flag
-    sparse(W, [28, 'PPPPP'], [69, 'cccc'], [84, 'BBBB'], [188, 'F']),
-    // r15 — coins over entry climb
-    sparse(W, [21, 'ccc']),
-    // r16 — entry climb mid; wall-top platform; final climb mid
-    sparse(W, [20, 'PPPPP'], [68, 'PPPPPP'], [138, 'PPPPP']),
-    // r17 — powerup block
-    sparse(W, [78, 'M']),
-    // r18 — coin arc over pit 1; castle top
-    sparse(W, [58, 'cccc'], [193, 'xxx']),
-    // r19 — bricks; final climb base; stairs; castle
-    sparse(W, [38, 'B?BB'], [88, 'B?B'], [130, 'PPPPP'], [168, '?B?'],
-      [182, 'XX'], [192, 'xxxxx']),
-    // r20 — entry platform; wall; pit island; stairs
-    sparse(W, [12, 'PPPPP'], [70, 'XX'], [115, 'PPP'], [180, 'XXXX']),
-    // r21 — starting coins; wall; stairs; castle (door gap at 194)
-    sparse(W, [8, 'ccc'], [70, 'XX'], [178, 'XXXXXX'], [192, 'xx'], [195, 'xx']),
-    // r22 — spawn; enemies; wall; stairs; castle + door
-    sparse(W, [3, 'p'], [44, 'e'], [70, 'XX'], [92, 'e'], [100, 'e'], [108, 'e'],
-      [158, 'e'], [164, 'e'], [176, ground(8)], [192, 'xx'], [194, 'd'], [195, 'xx']),
-    // r23/r24 — ground with two pits (58-61 and 114-118)
-    ground(58) + gap(4) + ground(52) + gap(5) + ground(81),
-    ground(58) + gap(4) + ground(52) + gap(5) + ground(81),
+    // r14 — notas altas (ruta opcional)
+    sparse(W, [30, 'nn'], [88, 'nn'], [126, 'nn'], [172, 'nn']),
+    // r15 — azoteas altas
+    sparse(W, [28, 'PPPPP'], [86, 'PPPPP'], [124, 'PPPPP'], [166, 'PPPPP'], [194, 'PPPPP']),
+    // r16 — monedas sobre las azoteas
+    sparse(W, [29, 'ccc'], [87, 'ccc'], [125, 'ccc'], [167, 'ccc'], [195, 'ccc']),
+    // r17 — balcones medios
+    sparse(W, [16, 'PPPP'], [48, 'PPPP'], [74, 'PPPP'], [110, 'PPPP'], [152, 'PPPP'], [184, 'PPPP']),
+    // r18 — plataformas que cruzan los huecos
+    sparse(W, [60, 'PPPP'], [102, 'PPPP']),
+    // r19 — bloques y cajas con música
+    sparse(W, [40, 'B?B'], [80, 'ccc'], [118, 'B?B'], [156, 'B?B'], [190, 'ccc']),
+    // r20 — balcones bajos (incluye el puente sobre el hueco nuevo)
+    sparse(W, [24, 'PPP'], [52, 'PPP'], [92, 'PPP'], [134, 'PPP'], [146, 'PPP'], [176, 'PPP']),
+    // r21 — notas y monedas a ras de suelo
+    sparse(W, [10, 'c'], [22, 'n'], [36, 'cc'], [58, 'n'], [76, 'cc'], [96, 'n'],
+      [114, 'cc'], [132, 'n'], [156, 'cc'], [176, 'n'], [194, 'cc']),
+    // r22 — inicio, farolitos, enemigos, cofre, sorpresa y meta
+    sparse(W, [3, 'p'], [6, '>'], [14, '*'], [26, 'e'], [44, '"'], [56, 'e'],
+      [70, '*'], [84, 'e'], [100, '^'], [112, 'n'], [128, 'K'],
+      [140, '*'], [154, 'e'], [168, 'J'], [182, '"'], [194, 'e'], [200, 'G']),
+    // r23/r24 — suelo con cuatro huecos (38-40, 70-72, 100-102, 147-149)
+    ground(38) + gap(3) + ground(29) + gap(3) + ground(27) + gap(3) + ground(44) + gap(3) + ground(58),
+    ground(38) + gap(3) + ground(29) + gap(3) + ground(27) + gap(3) + ground(44) + gap(3) + ground(58),
   ],
 };

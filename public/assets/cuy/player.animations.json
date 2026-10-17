@@ -1,0 +1,58 @@
+{
+  "name": "cuy",
+  "frameWidth": 32,
+  "frameHeight": 32,
+  "frames": 22,
+  "sheet": "player.png",
+  "animations": {
+    "idle": {
+      "frames": [
+        0,
+        3
+      ],
+      "count": 4
+    },
+    "run": {
+      "frames": [
+        4,
+        9
+      ],
+      "count": 6
+    },
+    "jump": {
+      "frames": [
+        10,
+        11
+      ],
+      "count": 2
+    },
+    "fall": {
+      "frames": [
+        12,
+        13
+      ],
+      "count": 2
+    },
+    "land": {
+      "frames": [
+        14,
+        15
+      ],
+      "count": 2
+    },
+    "celebrate": {
+      "frames": [
+        16,
+        18
+      ],
+      "count": 3
+    },
+    "surprise": {
+      "frames": [
+        19,
+        21
+      ],
+      "count": 3
+    }
+  }
+}

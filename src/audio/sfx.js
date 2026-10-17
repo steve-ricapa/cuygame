@@ -144,6 +144,18 @@ class Sfx {
       case 'pipe':
         this.tone({ from: 300, to: 90, dur: 0.3, vol: 0.25 });
         break;
+      case 'chest':
+        this.arpeggio([392, 523, 659, 880], { step: 0.08, dur: 0.12, type: 'triangle', vol: 0.22 });
+        break;
+      case 'emblem':
+        this.arpeggio([784, 1047, 1319], { step: 0.07, dur: 0.1, type: 'triangle', vol: 0.2 });
+        break;
+      case 'wish':
+        this.tone({ type: 'triangle', from: 660, to: 990, dur: 0.5, vol: 0.18 });
+        break;
+      case 'gate':
+        this.arpeggio([523, 784, 1047], { step: 0.06, dur: 0.1, type: 'square', vol: 0.18 });
+        break;
     }
   }
 
@@ -178,6 +190,47 @@ class Sfx {
           [A4, A3], [0, 0], [0, 0], [E4, 0], [0, A3], [0, 0], [G4, E3], [0, 0],
           [F3 * 2, F3], [0, 0], [0, 0], [A4, 0], [0, F3], [0, 0], [G4, C3], [0, 0],
           [E4, A3], [0, 0], [0, 0], [0, 0], [B4, E3], [0, 0], [A4, A3], [0, 0],
+        ],
+      },
+      // --- Pistas del cumpleaños (respaldo si no hay archivos MP3) ---
+      // Introducción / epílogo: suave y cálido.
+      intro: {
+        bpm: 92,
+        steps: [
+          [C5, C3], [0, 0], [E5, 0], [0, G3], [G5, 0], [0, 0], [E5, A3], [0, 0],
+          [F5, F3], [0, 0], [A5, 0], [0, C3], [G5, F3], [0, 0], [E5, G3], [0, 0],
+          [D5, A3], [0, 0], [F5, 0], [0, F3], [A5, C3], [0, 0], [G5, G3], [0, 0],
+          [C5, C3], [0, 0], [0, G3], [E5, 0], [0, C3], [0, 0], [0, G3], [0, 0],
+        ],
+      },
+      // Nivel 1: jardín luminoso.
+      garden: {
+        bpm: 132,
+        steps: [
+          [G5, C3], [0, 0], [E5, G3], [0, 0], [C5, C3], [D5, 0], [E5, G3], [0, 0],
+          [F5, F3], [0, 0], [D5, A3], [0, 0], [C5, F3], [0, 0], [E5, C3], [0, 0],
+          [A5, A3], [0, 0], [G5, E3], [0, 0], [E5, A3], [F5, 0], [G5, F3], [0, 0],
+          [C5, C3], [E5, 0], [D5, G3], [0, 0], [C5, C3], [0, 0], [0, G3], [0, 0],
+        ],
+      },
+      // Nivel 2: ciudad al atardecer, más serena.
+      dusk: {
+        bpm: 104,
+        steps: [
+          [A4, F3], [0, 0], [C5, A3], [0, 0], [E5, 0], [D5, F3], [C5, 0], [0, A3],
+          [B4, G3], [0, 0], [D5, B2], [0, 0], [F5, 0], [E5, G3], [D5, 0], [0, B2],
+          [C5, C3], [0, 0], [E5, G3], [0, 0], [G5, 0], [F5, C3], [E5, 0], [0, G3],
+          [D5, F3], [C5, 0], [B4, G3], [0, 0], [A4, A3], [0, 0], [0, E3], [0, 0],
+        ],
+      },
+      // Nivel 3: castillo entre nubes, etéreo.
+      sky: {
+        bpm: 120,
+        steps: [
+          [E5, G3], [0, 0], [G5, 0], [0, E3], [C5, C3], [0, 0], [E5, G3], [F5, 0],
+          [A5, F3], [0, 0], [G5, 0], [0, C3], [E5, F3], [D5, 0], [C5, A3], [0, 0],
+          [G5, C3], [0, 0], [B4, G3], [0, 0], [D5, B2], [E5, 0], [G5, G3], [0, 0],
+          [C5, C3], [B4, 0], [A4, A3], [0, 0], [G4, G3], [0, 0], [0, C3], [0, 0],
         ],
       },
     };

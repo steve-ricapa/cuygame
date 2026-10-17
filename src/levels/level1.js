@@ -1,47 +1,43 @@
 import { sparse, ground, gap } from './builder.js';
 
-// WORLD 1-1 — overworld, ~6.3 screens wide.
-// Rows are bottom-anchored: the last row is the bottom of the world.
-// See LEVELS.md for the character legend.
+// NIVEL 1 — La pequeña soñadora (jardín luminoso).
+// Recorrido amable: terreno seguro al inicio, saltos amplios y una zona
+// despejada que lleva al cofre (col 139) y a la meta (arco 'G' en col 160).
+// El cofre 'K' está sobre suelo firme y la salida queda bloqueada hasta
+// confirmar el recuerdo.
 
-const W = 280;
+const W = 170;
 
 export default {
-  name: 'WORLD 1-1',
-  theme: 'overworld',
+  name: '1 · La pequeña soñadora',
+  title: 'La pequeña soñadora',
+  theme: 'garden',
   next: 'level2',
-  // the 't' pipe leads to the bonus room and its exit drops you at col 168
-  secret: { room: 'bonus11', exitCol: 168 },
+  memory: 'memory-childhood',
+  emblem: 'flower',
   width: W,
   rows: [
-    // r13 — star block over the brick deck; high coin trail
-    sparse(W, [83, 'S'], [188, 'cccc']),
-    // r14 — flag top; coins over platform
-    sparse(W, [59, 'ccc'], [256, 'F']),
-    // r15 — upper brick deck; coins; high-route platforms
-    sparse(W, [24, 'ccc'], [82, 'BBBB'], [121, 'ccc'], [179, 'cccc'], [187, 'PPPPPP'], [197, 'cccc']),
-    // r16
-    sparse(W, [58, 'PPPPP'], [66, 'ccc']),
-    // r17 — early platforms, mid platforms, high route
-    sparse(W, [23, 'PPPPP'], [31, 'ccc'], [109, 'ccc'], [120, 'PPPPP'], [178, 'PPPPPP'], [196, 'PPPPPP']),
-    // r18 — platform enemy, hidden 1-UP block, coin arc over pit 2
-    sparse(W, [53, 'e'], [65, 'PPPPP'], [96, 'cccc'], [132, 'H'], [147, 'cc'], [264, 'xxx']),
-    // r19 — first blocks, platforms, bricks, secret pipe top, final blocks, castle
-    sparse(W, [16, 'BMB'], [30, 'PPPPP'], [45, 'ccc'], [51, 'PPPPP'], [73, 't'], [78, 'BB?BB'],
-      [85, 'BMB'], [108, 'PPPPP'], [128, '?'], [137, '?'], [206, 'T'], [212, 'B?B?B'],
-      [246, 'XX'], [262, 'xxxxxxx']),
-    // r20 — first pipe, pyramid top, the secret room's EXIT pipe, stairs, castle
-    sparse(W, [42, 'T'], [146, 'XXXX'], [168, 'T'], [244, 'XXXX'], [262, 'xxxxxxx']),
-    // r21 — walking coins, pyramid, stairs, castle (door gap at 265)
-    sparse(W, [8, 'ccccc'], [144, 'XXXXXXXX'], [170, 'cccc'], [242, 'XXXXXX'],
-      [262, 'xxx'], [266, 'xxx']),
-    // r22 — spawn, decorations, enemies, pyramid base, stairs, castle + door
-    sparse(W, [3, 'p'], [6, '>'], [20, '*'], [36, '^'], [38, 'e'], [50, '"'], [64, 'e'],
-      [90, 'e'], [93, 'e'], [105, 'e'], [118, 'e'], [130, '"'], [131, 'e'], [142, ground(12)],
-      [156, '*'], [162, 'e'], [174, '^'], [185, 'e'], [195, 'e'], [203, 'e'], [222, 'e'],
-      [226, 'e'], [232, '^'], [240, ground(8)], [250, '"'], [262, 'xxx'], [265, 'd'], [266, 'xxx']),
-    // r23/r24 — ground with two pits (45-47 and 96-99)
-    ground(45) + gap(3) + ground(48) + gap(4) + ground(180),
-    ground(45) + gap(3) + ground(48) + gap(4) + ground(180),
+    // r15 — flores altas sobre las plataformas
+    sparse(W, [22, 'ff'], [60, 'ff'], [120, 'ff']),
+    // r16 — plataformas altas (ruta opcional)
+    sparse(W, [20, 'PPPPP'], [58, 'PPPPP'], [118, 'PPPPP']),
+    // r17 — monedas sobre las plataformas altas
+    sparse(W, [21, 'ccc'], [59, 'ccc'], [119, 'ccc']),
+    // r18 — plataformas medias
+    sparse(W, [12, 'PPPP'], [44, 'PPPP'], [86, 'PPPP'], [132, 'PPPP']),
+    // r19 — bloques y monedas
+    sparse(W, [30, 'B?B'], [70, 'ccc'], [100, 'B?B'], [140, 'ccc']),
+    // r20 — plataformas bajas y seguras
+    sparse(W, [28, 'PPP'], [66, 'PPP'], [96, 'PPP']),
+    // r21 — senderito de flores y monedas a ras de suelo
+    sparse(W, [8, 'c'], [18, 'f'], [34, 'cc'], [52, 'f'], [72, 'cc'], [92, 'f'],
+      [110, 'cc'], [128, 'f'], [150, 'cc']),
+    // r22 — inicio, decoración, enemigos suaves, cofre y meta
+    sparse(W, [3, 'p'], [6, '>'], [14, '*'], [24, 'e'], [36, '"'], [48, 'e'],
+      [62, '*'], [78, 'e'], [94, '^'], [108, 'e'], [132, '"'], [139, 'K'],
+      [160, 'G']),
+    // r23/r24 — suelo con dos hoyos pequeños (40-42 y 73-75)
+    ground(40) + gap(3) + ground(30) + gap(3) + ground(94),
+    ground(40) + gap(3) + ground(30) + gap(3) + ground(94),
   ],
 };

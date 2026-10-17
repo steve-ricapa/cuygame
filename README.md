@@ -1,29 +1,42 @@
-# Astro Hop 👾
+# Cuy Adventure — Misión Cumpleaños 🐹
+
+Una aventura de cumpleaños de tres niveles, hecha con Phaser 3 y Vite a partir
+de [AstroHop](https://github.com/nunoamorim99/AstroHop). El contenido personal
+se mantiene fuera de Git; consulta [PERSONALIZAR.md](PERSONALIZAR.md).
+
+## Proyecto de origen
 
 Astro Hop is a retro, Mario-style 2D platformer built with Phaser 3 and Vite (vanilla JS), playable on desktop and mobile from the same URL and deployed to GitHub Pages.
 The project has two goals running in parallel. The first is hands-on game development — physics and game feel, sprite animation, tilemap level design, power-up state machines, mobile touch controls, and a full game-flow loop. The second is using the build as a way to understand the Claude Fable 5 model: how far it can be pushed as a coding partner, where it excels, and where it needs steering, across everything from architecture decisions to spritesheet analysis and asset generation.
 Built with original assets (not Nintendo IP), starting from Kenney.nl's CC0 pixel-art packs.
 
-**▶ Play it live:** https://nunoamorim99.github.io/AstroHop/
+**▶ Proyecto original AstroHop:** https://nunoamorim99.github.io/AstroHop/
 
 <!-- TODO: screenshot/GIF here, e.g.: ![gameplay](docs/screenshot.png) -->
 
-## Features
+> **🎂 Esta copia es «Cuy Adventure — Misión Cumpleaños».** Sobre el motor de
+> AstroHop se construyó una aventura de 3 niveles como regalo de cumpleaños:
+> cofres que revelan fotos personales, un epílogo con carta, vela y recompensa.
+> Si vas a personalizarla, empieza por **[PERSONALIZAR.md](PERSONALIZAR.md)**.
+> Estado, fuentes de arte y pruebas: [`docs/`](docs/). Los créditos de abajo
+> corresponden al proyecto original y se mantienen.
 
-- Classic mechanics: run & jump with proper game feel (acceleration,
-  variable jump height), coin collecting, stompable enemies, breakable
-  bricks and question blocks
-- Power-ups: grow mushroom, fire gem (bouncing fireballs), invincibility
-  star — with a SMALL → BIG → FIRE state machine
-- Two hand-built levels (sunny overworld + underground cave), a secret
-  coin vault behind a pipe, a hidden 1-UP block, flagpole finishes with
-  height bonus
-- Full game flow: title screen, intro cards, lives, level timer, pause
-  menu, game over, persistent high score
-- All sound effects and music synthesized live with the Web Audio API —
-  zero audio files
-- Levels are plain-text grids — see [LEVELS.md](LEVELS.md) and design
-  your own
+## Esta versión del juego
+
+- Tres niveles con el cuy como protagonista, cofres obligatorios, dos cofres
+  sorpresa opcionales, mensajes de bloques y una celebración final.
+- Fotos completas que se confirman antes de abrir la meta; álbum de recuerdos,
+  carta opcional y vale de cumpleaños descargable como PNG.
+- Controles para teclado y pantalla táctil, en vertical y horizontal; sin
+  pantalla completa ni orientación obligatorias.
+- Música personal opcional (si falta, se usa música sintetizada original).
+- Las fotos y los MP3 **no están en Git**: un despliegue desde este repositorio
+  muestra «Foto pendiente» y usa la música sintetizada. Para entregar el regalo
+  completo, consulta [PERSONALIZAR.md](PERSONALIZAR.md) y empaqueta una copia
+  privada de `dist/` con los archivos autorizados.
+
+El código y créditos del proyecto original permanecen en el historial y en la
+sección de licencias de abajo.
 
 ## Tech stack
 
@@ -45,15 +58,13 @@ Then open the URL Vite prints (usually `http://localhost:5173`).
 | Action | Desktop | Mobile |
 | ------ | ------- | ------ |
 | Move   | Arrow keys or A/D | On-screen ◀ ▶ |
-| Enter pipe | ↓ or S | On-screen ▼ |
 | Jump   | Space, W or ↑ (hold for higher jump) | On-screen **A** button |
-| Fireball (FIRE state) | Shift or X | On-screen **B** button |
 | Pause  | Esc or P | ▐▐ button (top right) |
 | Sound on/off | ♪ button | ♪ button |
 | Fullscreen | ⛶ button | ⛶ button (Android) |
 
 The touch pad supports press-and-hold, sliding between buttons without
-lifting, and multi-touch (run + jump + fire at once). In portrait the game
+lifting, and multi-touch (run + jump at once). In portrait the game
 sits above a handheld-style control deck; in landscape the buttons overlay
 the screen edges semi-transparently.
 

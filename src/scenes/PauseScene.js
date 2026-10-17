@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
-import { saveHighScore } from '../highscore.js';
+import { music } from '../audio/music.js';
+import { resetProgress } from '../state/save.js';
+import { showChoice, closeAll } from '../ui/narrative.js';
 
-// Overlay launched on top of a paused GameScene.
-// Works with keyboard (arrows + enter), mouse and touch.
+// Menú de pausa sobre GameScene (que queda en pausa).
 export default class PauseScene extends Phaser.Scene {
   constructor() {
     super('PauseScene');
@@ -12,27 +13,29 @@ export default class PauseScene extends Phaser.Scene {
     const { width, height } = this.scale;
     this.scale.once('resize', () => this.scene.restart());
 
-    this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.6);
+    this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.62);
     this.add
-      .text(width / 2, 150, 'PAUSED', {
+      .text(width / 2, 120, 'Pausa', {
         fontFamily: 'monospace',
         fontSize: '40px',
         fontStyle: 'bold',
-        color: '#ffffff',
+        color: '#ffe066',
       })
       .setOrigin(0.5)
       .setStroke('#000000', 6);
 
     this.options = [
-      { label: 'RESUME', action: () => this.resumeGame() },
-      { label: 'QUIT TO TITLE', action: () => this.quitToTitle() },
+      { label: 'Continuar', action: () => this.resumeGame() },
+      { label: 'Ver mi álbum', action: () => this.openAlbum() },
+      { label: 'Reiniciar la aventura', action: () => this.confirmReset() },
+      { label: 'Salir al inicio', action: () => this.quitToTitle() },
     ];
     this.selected = 0;
     this.texts = this.options.map((opt, i) => {
       const t = this.add
-        .text(width / 2, 230 + i * 48, opt.label, {
+        .text(width / 2, 196 + i * 46, opt.label, {
           fontFamily: 'monospace',
-          fontSize: '22px',
+          fontSize: '20px',
           fontStyle: 'bold',
           color: '#ffffff',
         })
@@ -66,14 +69,42 @@ export default class PauseScene extends Phaser.Scene {
   }
 
   resumeGame() {
+    closeAll();
     this.scene.stop();
+    music.resume();
     this.scene.resume('GameScene');
   }
 
+  async openAlbum() {
+    const gs = this.scene.get('GameScene');
+    music.pause();
+    await gs.openAlbum?.();
+    music.resume();
+  }
+
+  async confirmReset() {
+    const answer = await showChoice({
+      title: '¿Reiniciar la aventura?',
+      message: 'Se borrarán los recuerdos guardados en este dispositivo. Las fotos y la carta no se tocan.',
+      yes: 'Sí, reiniciar',
+      no: 'Cancelar',
+    });
+    if (answer === 'yes') {
+      resetProgress();
+      this.scene.stop('GameScene');
+      this.scene.stop('HUDScene');
+      this.scene.stop();
+      music.stop();
+      this.scene.start('TitleScene');
+    }
+  }
+
   quitToTitle() {
-    saveHighScore(this.registry.get('score') ?? 0);
+    closeAll();
     this.scene.stop('GameScene');
     this.scene.stop('HUDScene');
+    music.stop();
+    this.scene.stop();
     this.scene.start('TitleScene');
   }
 }

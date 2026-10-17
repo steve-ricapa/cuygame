@@ -1,9 +1,41 @@
 import Phaser from 'phaser';
 import Player from '../objects/Player.js';
 import Walker from '../objects/Walker.js';
+import { rasterizeText } from '../assets/blockFont.js';
 import { touchState } from '../input/TouchControls.js';
 import { LEVELS, THEMES } from '../levels/index.js';
 import { sfx } from '../audio/sfx.js';
+import { music } from '../audio/music.js';
+import {
+  MEMORIES,
+  BONUS_MEMORIES,
+  BONUS_BY_CHAR,
+  HELP,
+  HELP_AFTER_FALLS,
+  SKY_MESSAGES,
+  levelById,
+  LEVELS as CAMPAIGN_LEVELS,
+} from '../content/birthday.js';
+import {
+  getState,
+  canExitLevel,
+  confirmMemory,
+  isMemoryConfirmed,
+  markBonusFound,
+  isBonusFound,
+  getAudioPreference,
+  setAudioPreference,
+} from '../state/save.js';
+import { resolvePhoto } from '../ui/photos.js';
+import {
+  showMemory,
+  showChoice,
+  showAlbum,
+  openPhotoViewer,
+  setOnStackEmpty,
+  closeAll,
+  toast,
+} from '../ui/narrative.js';
 
 // ---- World ----
 const GAME_WIDTH = 800;
@@ -29,76 +61,75 @@ const T = {
   BLOCK_QUESTION: 10,
   BLOCK_USED: 31,
   BRICK: 6,
-  MUSHROOM: 128,
-  POLE: 131,
-  FLAG: 111,
-  DOOR_TOP: 130,
-  DOOR_BOTTOM: 150,
 };
 
-const DECOR = { '>': T.SIGN_RIGHT, '*': T.BUSH, '^': T.PINE, '"': T.SPROUT, o: 145 /* snowman */ };
+const DECOR = { '>': T.SIGN_RIGHT, '*': T.BUSH, '^': T.PINE, '"': T.SPROUT, o: 145 };
+
+// Collectible grid char → emblem texture + label.
+const COLLECTIBLES = {
+  f: { texture: 'emblem-flower', label: 'flor' },
+  n: { texture: 'emblem-note', label: 'nota musical' },
+  s: { texture: 'emblem-star', label: 'estrella' },
+};
 
 const STOMP_BOUNCE = -300;
+const ASSIST_JUMP_VELOCITY = -430;
+const GATE_BARRIER_HEIGHT = 160;
 
-// ---- Fireballs ----
-const FIREBALL_SPEED = 300;
-const FIREBALL_BOUNCE_VY = -170; // low hop so small enemies can't be jumped over
-const FIREBALL_LIFETIME = 3000;
-const MAX_FIREBALLS = 2;
+// "Game feel" del salto: evita que se pierda una pulsación al correr o al
+// pisar el borde de una plataforma.
+const JUMP_BUFFER_MS = 130; // recuerda el salto pulsado justo antes de aterrizar
+const COYOTE_MS = 100; // permite saltar un instante después de dejar el suelo
 
-// ---- Scoring ----
+// ---- Scoring (kept minimal: the game is a gift, not a competition) ----
 const SCORE_COIN = 100;
-const SCORE_BRICK = 50;
+const SCORE_COLLECTIBLE = 250;
 const SCORE_STOMP = 100;
-const SCORE_POWERUP = 1000;
-const SCORE_STAR_KILL = 200;
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
     super('GameScene');
   }
 
-  /** Everything that can vary between visits arrives via scene data. */
   init(data) {
     this.levelId = data.levelId ?? 'level1';
     this.spawnColOverride = data.spawnCol ?? null;
-    this.startPower = data.powerState ?? 'SMALL';
-    this.returnTo = data.returnTo ?? null; // set while inside a bonus room
-    this.exitViaPipe = data.exitViaPipe ?? false; // rise out of the pipe at spawnCol
-    this.keepTime = data.keepTime ?? false; // pipe travel keeps the level timer
-    // What's already been collected/killed/broken, per level — carried
-    // through pipe travel so the world keeps its state across the trip.
-    // Death and level changes do NOT carry it, so everything respawns.
-    this.consumedAll = data.consumed ?? {};
   }
 
   create() {
     this.level = LEVELS[this.levelId];
     this.theme = THEMES[this.level.theme];
     this.worldWidth = this.level.width * TILE;
+    this.contentLevel = levelById(this.levelId);
+
+    this.worldFrozen = false;
+    this.finishing = false;
+    this.falls = 0;
+    this.helpOffered = false;
+    this.assist = false;
+    this.airJumpUsed = false;
+    this.gateHintShown = false;
+
+    this.chests = [];
+    this.collected = 0;
+    this.collectibleTotal = 0;
 
     if (!this.scene.isActive('HUDScene')) this.scene.launch('HUDScene');
-    this.registry.set('world', this.level.name.replace(/^WORLD\s*/, ''));
-    this.setupTimer();
-    this.setupPause();
+    this.registry.set('world', this.level.title ?? this.level.name);
+    this.registry.set('coins', 0);
+    this.registry.set('score', 0);
 
-    sfx.startMusic(this.level.theme);
-    this.events.once('shutdown', () => sfx.stopMusic());
-
-    this.autoPhase = null; // null | 'pipe' | 'flag' | 'walk' | 'done'
-    this.pipeUnder = null;
-    this.doorX = null;
-    this.pipes = []; // {colLeft, colRight, topRow, cx} of every pipe built
-    this.consumed = new Set(this.consumedAll[this.levelId] ?? []);
+    music.play(this.contentLevel?.music ?? 'intro');
 
     this.solids = [];
     this.blocks = this.physics.add.staticGroup();
     this.coins = this.add.group();
     this.enemies = this.add.group();
-    this.items = this.physics.add.group();
-    this.fireballs = this.physics.add.group();
-    this.pipeSensors = this.physics.add.staticGroup();
-    this.hiddenSensors = this.physics.add.staticGroup();
+    this.collectibles = this.add.group();
+    this.chestZones = this.physics.add.staticGroup();
+    this.gateSolids = this.physics.add.staticGroup();
+    this.gateZones = this.physics.add.staticGroup();
+    this.gate = null;
 
     this.cameras.main.setBackgroundColor(this.theme.sky);
     if (this.theme.parallax) this.buildParallax();
@@ -107,8 +138,14 @@ export default class GameScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, this.worldWidth, GAME_HEIGHT, true, true, true, false);
 
     this.parseGrid();
+    this.drawSkyMessages();
     this.spawnPlayer();
     this.setupInput();
+    this.setupPause();
+
+    this.registry.set('coins', 0);
+    this.registry.set('emblems', 0);
+    this.registry.set('collectiblesTotal', this.collectibleTotal);
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, this.worldWidth, GAME_HEIGHT);
@@ -118,27 +155,30 @@ export default class GameScene extends Phaser.Scene {
     // --- Physics wiring
     this.physics.add.collider(this.player, this.solids);
     this.physics.add.collider(this.player, this.blocks, this.onPlayerBlockCollide, null, this);
+    this.physics.add.collider(this.player, this.gateSolids, this.onGateBlock, null, this);
     this.physics.add.collider(this.enemies, this.solids);
     this.physics.add.collider(this.enemies, this.blocks);
+    this.physics.add.collider(this.enemies, this.gateSolids);
     this.physics.add.collider(this.enemies, this.enemies);
-    this.physics.add.collider(this.items, this.solids, this.onItemBounce, null, this);
-    this.physics.add.collider(this.items, this.blocks, this.onItemBounce, null, this);
-    this.physics.add.collider(this.fireballs, this.solids, this.onFireballBounce, null, this);
-    this.physics.add.collider(this.fireballs, this.blocks, this.onFireballBounce, null, this);
     this.physics.add.overlap(this.player, this.coins, this.onCollectCoin, null, this);
-    this.physics.add.overlap(this.player, this.items, this.onCollectItem, null, this);
+    this.physics.add.overlap(this.player, this.collectibles, this.onCollectEmblem, null, this);
     this.physics.add.overlap(this.player, this.enemies, this.onPlayerEnemyContact, null, this);
-    this.physics.add.overlap(this.player, this.pipeSensors, (p, s) => (this.pipeUnder = s));
-    this.physics.add.overlap(this.player, this.hiddenSensors, this.onHiddenSensor, null, this);
-    this.physics.add.overlap(this.fireballs, this.enemies, this.onFireballHitsEnemy, null, this);
-    if (this.flagZone) {
-      this.physics.add.overlap(this.player, this.flagZone, this.startFlagSequence, null, this);
-    }
+    this.physics.add.overlap(this.player, this.chestZones, this.onChestZone, null, this);
+    this.physics.add.overlap(this.player, this.gateZones, this.onGateZone, null, this);
+
+    // If this memory was already confirmed (replay), the gate starts open.
+    if (isMemoryConfirmed(this.level.memory)) this.openGate(true);
+
+    this.events.once('shutdown', () => {
+      music.duck(false);
+      setOnStackEmpty(null);
+      closeAll();
+      document.getElementById('app')?.removeAttribute('inert');
+    });
   }
 
   // ----------------------------------------------------- grid parsing
 
-  /** Pad the level rows into a full ROWS×width char matrix (bottom-anchored). */
   buildMatrix() {
     const { rows, width } = this.level;
     const empty = ' '.repeat(width);
@@ -151,7 +191,6 @@ export default class GameScene extends Phaser.Scene {
     const width = this.level.width;
     this.grid = grid;
 
-    // 'X' = solid, 'x' = decorative (drawn the same, no collision)
     const isFilled = (row, col) =>
       row >= 0 && row < ROWS && col >= 0 && col < width &&
       (grid[row][col] === 'X' || grid[row][col] === 'x');
@@ -164,7 +203,6 @@ export default class GameScene extends Phaser.Scene {
         const y = row * TILE + TILE / 2;
 
         if (ch === 'X') {
-          // merge the whole horizontal run into ONE body (no seams)
           const start = col;
           while (col < width && grid[row][col] === 'X') {
             const frame = isFilled(row - 1, col) ? this.theme.terrainFill : this.theme.terrainTop;
@@ -177,7 +215,6 @@ export default class GameScene extends Phaser.Scene {
         }
 
         if (ch === 'x') {
-          // decorative terrain (castles etc.) — visual only, no body
           const frame = isFilled(row - 1, col) ? this.theme.terrainFill : this.theme.terrainTop;
           this.add.image(x, y, 'tiles', frame);
           col++;
@@ -191,57 +228,45 @@ export default class GameScene extends Phaser.Scene {
           continue;
         }
 
-        // Every entity's identity is its grid cell — 'gone' means it was
-        // consumed before a pipe trip and must not respawn.
-        const key = `r${row}c${col}`;
-        const gone = this.consumed.has(key);
+        // Cofres sorpresa (letra propia → id de recuerdo). No son obligatorios.
+        if (BONUS_BY_CHAR[ch]) {
+          this.buildBonusChest(col, row, BONUS_BY_CHAR[ch]);
+          col++;
+          continue;
+        }
 
         switch (ch) {
           case 'B':
-            if (!gone) this.addBlock(x, y, T.BRICK, 'brick', null, key);
+            this.addBlock(x, y, T.BRICK, 'brick');
             break;
           case '?':
-            if (gone) this.addBlock(x, y, T.BLOCK_USED, 'used', null, key);
-            else this.addBlock(x, y, T.BLOCK_QUESTION, 'question', 'coin', key);
-            break;
           case 'M':
-            if (gone) this.addBlock(x, y, T.BLOCK_USED, 'used', null, key);
-            else this.addBlock(x, y, T.BLOCK_QUESTION, 'question', 'powerup', key);
-            break;
           case 'S':
-            if (gone) this.addBlock(x, y, T.BLOCK_USED, 'used', null, key);
-            else this.addBlock(x, y, T.BLOCK_QUESTION, 'question', 'star', key);
-            break;
-          case 'H':
-            if (gone) this.addBlock(x, y, T.BLOCK_USED, 'used', null, key);
-            else this.addHiddenBlock(x, y, key);
+            this.addBlock(x, y, T.BLOCK_QUESTION, 'question', 'coin');
             break;
           case 'c': {
-            if (gone) break;
             const coin = this.add.sprite(x, y, 'tiles', T.COIN).play('coin-spin');
             this.physics.add.existing(coin, true);
-            coin.setData('key', key);
             this.coins.add(coin);
             break;
           }
           case 'e':
-            if (!gone) this.enemies.add(new Walker(this, x, y, key));
+            this.enemies.add(new Walker(this, x, y));
             break;
           case 'p':
             this.spawnCol = col;
-            this.spawnRow = row; // floor is searched from HERE down (rooms have ceilings!)
+            this.spawnRow = row;
             break;
-          case 'T':
-            this.buildPipe(col, row, false);
+          case 'K':
+            this.buildChest(col, row);
             break;
-          case 't':
-            this.buildPipe(col, row, true);
+          case 'G':
+            this.buildGate(col, row);
             break;
-          case 'F':
-            this.buildFlag(col, row);
-            break;
-          case 'd':
-            this.buildDoor(col, row);
+          case 'f':
+          case 'n':
+          case 's':
+            this.buildCollectible(x, y, ch);
             break;
           default:
             if (DECOR[ch]) {
@@ -253,12 +278,44 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  /** First terrain row at/below `fromRow` in this column (for pipes/flag/spawn). */
   findFloorRow(col, fromRow = 0) {
     for (let row = fromRow; row < ROWS; row++) {
       if (this.grid[row][col] === 'X') return row;
     }
-    return ROWS - 2; // sensible fallback: standard ground height
+    return ROWS - 2;
+  }
+
+  // ----------------------------------------------------- sky messages
+  //
+  // Dibuja el mensaje de este nivel (SKY_MESSAGES) con "bloques" en el cielo.
+  // Son imágenes decorativas sin cuerpo de física, así que NUNCA estorban el
+  // camino: el mensaje queda elevado y se atraviesa sin más.
+  drawSkyMessages() {
+    const msg = SKY_MESSAGES.find((m) => m.level === this.levelId);
+    if (!msg || !msg.text) return;
+
+    const { cells, width } = rasterizeText(msg.text);
+    if (!cells.length) return;
+
+    // Centrado sobre la primera pantalla salvo que se indique `col`.
+    const screenCols = Math.floor(GAME_WIDTH / TILE);
+    const startCol = Number.isInteger(msg.col)
+      ? msg.col
+      : Math.max(1, Math.round((screenCols - width) / 2));
+    const startRow = Math.max(0, msg.row ?? 3);
+
+    const maxCol = this.level.width - 1;
+    const maxRow = ROWS - 1;
+    this.bannerTiles = [];
+    for (const { dx, dy } of cells) {
+      const col = startCol + dx;
+      const row = startRow + dy;
+      if (col < 0 || col > maxCol || row < 0 || row > maxRow) continue;
+      const img = this.add
+        .image(col * TILE + TILE / 2, row * TILE + TILE / 2, 'tiles', T.BRICK)
+        .setDepth(1);
+      this.bannerTiles.push(img);
+    }
   }
 
   buildPlatform(startCol, run, row) {
@@ -273,72 +330,11 @@ export default class GameScene extends Phaser.Scene {
     this.addSolid(startCol * TILE + (run * TILE) / 2, y, run * TILE, TILE);
   }
 
-  buildPipe(col, topRow, enterable) {
-    const bottomRow = this.findFloorRow(col, topRow);
-    const cx = (col + 1) * TILE; // centre of the 2-tile-wide pipe
-
-    // depth 3: pipes render in FRONT of the player, so emerging from
-    // (or sinking into) a pipe clips the sprite like in classic Mario
-    this.add.image(cx, topRow * TILE + TILE / 2, 'pipe-mouth').setDepth(3);
-    const shaftH = (bottomRow - topRow - 1) * TILE;
-    if (shaftH > 0) {
-      this.add
-        .tileSprite(cx, (topRow + 1) * TILE + shaftH / 2, 36, shaftH, 'pipe-shaft')
-        .setDepth(3);
-    }
-    this.pipes.push({ colLeft: col, colRight: col + 1, topRow, cx });
-
-    const height = (bottomRow - topRow) * TILE;
-    this.addSolid(cx, topRow * TILE + height / 2, 40, height);
-
-    if (enterable) {
-      // thin sensor lying on the pipe mouth — standing here + Down = enter
-      const sensor = this.add.zone(cx, topRow * TILE - 4, TILE * 2 - 6, 8);
-      this.physics.add.existing(sensor, true);
-      this.pipeSensors.add(sensor);
-    }
-  }
-
-  buildFlag(col, topRow) {
-    const bottomRow = this.findFloorRow(col, topRow);
-    const x = col * TILE + TILE / 2;
-
-    this.flagSprite = this.add.sprite(x, topRow * TILE + TILE / 2, 'tiles', T.FLAG);
-    this.flagSprite.play('flag-wave');
-    for (let row = topRow + 1; row < bottomRow; row++) {
-      this.add.image(x, row * TILE + TILE / 2, 'tiles', T.POLE);
-    }
-
-    this.flagInfo = { x, topY: topRow * TILE, bottomY: bottomRow * TILE };
-    this.flagZone = this.add.zone(x, (topRow * TILE + bottomRow * TILE) / 2, 10, bottomRow * TILE - topRow * TILE);
-    this.physics.add.existing(this.flagZone, true);
-  }
-
-  buildDoor(col, row) {
-    const x = col * TILE + TILE / 2;
-    this.add.image(x, (row - 1) * TILE + TILE / 2, 'tiles', T.DOOR_TOP);
-    this.add.image(x, row * TILE + TILE / 2, 'tiles', T.DOOR_BOTTOM);
-    this.doorX = x;
-  }
-
-  addBlock(x, y, frame, type, content = null, key = null) {
+  addBlock(x, y, frame, type, content = null) {
     const block = this.blocks.create(x, y, 'tiles', frame);
     block.setData('type', type);
     if (content) block.setData('content', content);
-    if (key) block.setData('key', key);
     return block;
-  }
-
-  /** Invisible block: no body until hit from below (via its sensor). */
-  addHiddenBlock(x, y, key) {
-    const block = this.addBlock(x, y, T.BLOCK_USED, 'hidden', null, key);
-    block.setVisible(false);
-    block.body.enable = false;
-
-    const sensor = this.add.zone(x, y, TILE, TILE);
-    this.physics.add.existing(sensor, true);
-    sensor.setData('block', block);
-    this.hiddenSensors.add(sensor);
   }
 
   addSolid(x, y, width, height) {
@@ -348,53 +344,146 @@ export default class GameScene extends Phaser.Scene {
     return zone;
   }
 
+  buildCollectible(x, y, ch) {
+    const spec = COLLECTIBLES[ch];
+    const sprite = this.add.sprite(x, y, spec.texture).setDepth(1);
+    sprite.setData('kind', ch);
+    this.physics.add.existing(sprite, true);
+    this.collectibles.add(sprite);
+    this.tweens.add({
+      targets: sprite,
+      y: y - 3,
+      duration: 900,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+    this.collectibleTotal += 1;
+  }
+
+  // ----------------------------------------------------- chest & gate
+
+  buildChest(col, row) {
+    const floorRow = this.findFloorRow(col, row);
+    const floorY = floorRow * TILE;
+    const cx = col * TILE + TILE / 2;
+    const memoryId = this.level.memory;
+    const confirmed = isMemoryConfirmed(memoryId);
+
+    const sprite = this.add.sprite(cx, floorY - 9, 'chest', confirmed ? 1 : 0).setDepth(1);
+    const zone = this.add.zone(cx, floorY - 60, 92, 140);
+    this.physics.add.existing(zone, true);
+    const index = this.chests.length;
+    zone.setData('chestIndex', index);
+    this.chestZones.add(zone);
+
+    this.chests.push({
+      kind: 'memory',
+      sprite,
+      zone,
+      memoryId,
+      floorRow,
+      col,
+      opened: false,
+      safeCol: Math.max(2, col - 5),
+    });
+  }
+
+  // Cofre sorpresa: no abre la meta, guarda un recuerdo extra en el álbum.
+  // Se distingue por el lazo (`gift`) que flota encima.
+  buildBonusChest(col, row, bonusId) {
+    const bonus = BONUS_MEMORIES[bonusId];
+    if (!bonus) return;
+    const floorRow = this.findFloorRow(col, row);
+    const floorY = floorRow * TILE;
+    const cx = col * TILE + TILE / 2;
+    const found = isBonusFound(bonusId);
+
+    const sprite = this.add.sprite(cx, floorY - 9, 'chest', found ? 1 : 0).setDepth(1);
+
+    let marker = null;
+    if (!found) {
+      marker = this.add.sprite(cx, floorY - 32, 'gift').setDepth(1);
+      this.tweens.add({
+        targets: marker,
+        y: floorY - 38,
+        duration: 900,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+    }
+
+    const zone = this.add.zone(cx, floorY - 60, 92, 140);
+    this.physics.add.existing(zone, true);
+    const index = this.chests.length;
+    zone.setData('chestIndex', index);
+    this.chestZones.add(zone);
+
+    this.chests.push({
+      kind: 'bonus',
+      bonusId,
+      sprite,
+      marker,
+      zone,
+      floorRow,
+      col,
+      opened: found,
+      safeCol: Math.max(2, col - 5),
+    });
+  }
+
+  buildGate(col, row) {
+    const floorRow = this.findFloorRow(col, row);
+    const floorY = floorRow * TILE;
+    const gx = col * TILE + TILE / 2;
+
+    this.add.image(gx, floorY, 'gate-arch').setOrigin(0.5, 1).setDepth(0);
+
+    const barrier = this.add
+      .tileSprite(gx, floorY - GATE_BARRIER_HEIGHT / 2, 20, GATE_BARRIER_HEIGHT, 'gate-barrier')
+      .setDepth(3);
+    const solid = this.add.zone(gx, floorY - GATE_BARRIER_HEIGHT / 2, 20, GATE_BARRIER_HEIGHT);
+    this.physics.add.existing(solid, true);
+    this.gateSolids.add(solid);
+
+    const zone = this.add.zone(gx, floorY - 30, 30, 60);
+    this.physics.add.existing(zone, true);
+    this.gateZones.add(zone);
+
+    this.gate = { x: gx, floorY, col, barrier, solid, open: false };
+  }
+
+  openGate(instant = false) {
+    if (!this.gate || this.gate.open) return;
+    this.gate.open = true;
+    this.gate.solid.destroy();
+    if (instant) {
+      this.gate.barrier.destroy();
+      return;
+    }
+    sfx.play('gate');
+    if (this.gate.barrier.body) this.gate.barrier.body.enable = false;
+    this.tweens.add({
+      targets: this.gate.barrier,
+      alpha: 0,
+      scaleY: 0.2,
+      duration: 500,
+      ease: 'Quad.easeIn',
+      onComplete: () => this.gate.barrier.destroy(),
+    });
+  }
+
   spawnPlayer() {
     const col = this.spawnColOverride ?? this.spawnCol ?? 3;
-
-    // Arriving from a bonus room: rise out of the pipe at the spawn column
-    const pipe = this.exitViaPipe
-      ? this.pipes.find((p) => col >= p.colLeft - 1 && col <= p.colRight + 1)
-      : null;
-
-    // Scan from the 'p' marker's row, NOT from the top of the world —
-    // otherwise a level with a ceiling would put the player on its roof.
     const fromRow = this.spawnColOverride !== null ? 0 : this.spawnRow ?? 0;
     const floorRow = this.findFloorRow(col, fromRow);
     const feetY = floorRow * TILE;
 
-    this.player = new Player(this, col * TILE + TILE / 2, feetY - 24);
-    if (this.startPower !== 'SMALL') {
-      this.player.powerState = this.startPower;
-      this.player.applyState();
-    }
-    // icy themes have less friction — the classic slide
-    if (this.theme.dragFactor) this.player.setDragFactor(this.theme.dragFactor);
-
-    if (pipe) {
-      // start hidden inside the mouth, slide up until standing on it
-      const mouthY = pipe.topRow * TILE;
-      this.player.x = pipe.cx;
-      this.player.y = mouthY + 20;
-      this.player.body.enable = false;
-      this.player.body.reset(this.player.x, this.player.y);
-      this.autoPhase = 'pipe';
-      this.tweens.add({
-        targets: this.player,
-        y: mouthY - 12 * this.player.scale,
-        duration: 600,
-        ease: 'Sine.easeOut',
-        onComplete: () => {
-          this.player.body.enable = true;
-          this.player.body.reset(this.player.x, this.player.y);
-          this.autoPhase = null;
-        },
-      });
-      return;
-    }
-
-    // feet exactly on the floor, whatever the current scale
-    this.player.y = feetY - 12 * this.player.scale;
+    this.player = new Player(this, col * TILE + TILE / 2, feetY - 12);
+    this.player.y = feetY - this.player.feetOffset;
     this.player.body.reset(this.player.x, this.player.y);
+    this.checkpoint = { col, row: fromRow };
   }
 
   // ----------------------------------------------------------- parallax
@@ -406,7 +495,6 @@ export default class GameScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(-10);
 
-    // clouds spread across the whole parallax span of the level
     const span = GAME_WIDTH + (this.worldWidth - GAME_WIDTH) * 0.2;
     for (let x = 100; x < span; x += Phaser.Math.Between(160, 240)) {
       const y = Phaser.Math.Between(50, 130);
@@ -425,71 +513,28 @@ export default class GameScene extends Phaser.Scene {
   onPlayerBlockCollide(player, block) {
     const hitFromBelow = player.body.touching.up && block.y < player.y;
     if (!hitFromBelow) return;
-
     const type = block.getData('type');
-    if (type === 'question') {
-      this.openQuestionBlock(block);
-    } else if (type === 'brick') {
-      // classic rule: only BIG or FIRE can smash bricks — small just bonks
-      if (this.player.powerState === 'SMALL') this.bumpBlock(block);
-      else this.breakBrick(block);
-    }
+    if (type === 'question') this.openQuestionBlock(block);
+    else if (type === 'brick') this.bumpBlock(block);
   }
 
   openQuestionBlock(block) {
-    const content = block.getData('content');
     block.setData('type', 'used');
     block.setFrame(T.BLOCK_USED);
-    this.consume(block.getData('key'));
     this.bumpBlock(block);
 
-    if (content === 'coin') {
-      const coin = this.add.sprite(block.x, block.y - TILE, 'tiles', T.COIN).play('coin-spin');
-      sfx.play('coin');
-      this.sparkle(block.x, block.y - TILE);
-      this.addScore(SCORE_COIN, block.x, block.y - TILE * 2);
-      this.registry.values.coins += 1;
-      this.tweens.add({
-        targets: coin,
-        y: coin.y - 30,
-        duration: 200,
-        ease: 'Quad.easeOut',
-        yoyo: true,
-        onComplete: () => coin.destroy(),
-      });
-    } else if (content === 'powerup') {
-      if (this.player.powerState === 'SMALL') this.spawnWalkingItem(block, 'mushroom', 'tiles', T.MUSHROOM);
-      else this.spawnFireGem(block);
-    } else if (content === 'star') {
-      this.spawnStar(block);
-    }
-  }
-
-  breakBrick(block) {
-    sfx.play('break');
-    this.cameras.main.shake(110, 0.006);
-    this.consume(block.getData('key'));
-    this.addScore(SCORE_BRICK, block.x, block.y - TILE);
-    const { x, y } = block;
-    block.destroy();
-
-    const bursts = [
-      [-60, -280], [60, -280],
-      [-110, -180], [110, -180],
-    ];
-    bursts.forEach(([vx, vy]) => {
-      const frag = this.add.image(x, y, 'tiles', T.BRICK).setScale(0.5);
-      this.physics.add.existing(frag);
-      frag.body.checkCollision.none = true;
-      frag.body.setVelocity(vx + Phaser.Math.Between(-20, 20), vy + Phaser.Math.Between(-40, 0));
-      frag.body.setAngularVelocity(Phaser.Math.Between(-400, 400));
-      this.tweens.add({
-        targets: frag,
-        alpha: 0,
-        delay: 250,
-        duration: 450,
-        onComplete: () => frag.destroy(),
-      });
+    const coin = this.add.sprite(block.x, block.y - TILE, 'tiles', T.COIN).play('coin-spin');
+    sfx.play('coin');
+    this.sparkle(block.x, block.y - TILE);
+    this.addScore(SCORE_COIN, block.x, block.y - TILE * 2);
+    this.bumpCoinCount();
+    this.tweens.add({
+      targets: coin,
+      y: coin.y - 30,
+      duration: 200,
+      ease: 'Quad.easeOut',
+      yoyo: true,
+      onComplete: () => coin.destroy(),
     });
   }
 
@@ -504,198 +549,18 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  onHiddenSensor(player, sensor) {
-    if (player.body.velocity.y >= -40) return; // must be rising into it
+  // ---------------------------------------------------- collect & score
 
-    const block = sensor.getData('block');
-    const blockBottom = block.y + TILE / 2;
-    if (player.body.top > blockBottom + 2 || player.body.top < blockBottom - 14) return;
-
-    sensor.destroy();
-    block.setVisible(true);
-    block.body.enable = true;
-    block.setData('type', 'used');
-    this.consume(block.getData('key'));
-    this.bumpBlock(block);
-    player.body.setVelocityY(50); // head bonk
-    this.spawnWalkingItem(block, 'oneup', 'mushroom-1up');
-  }
-
-  // -------------------------------------------------------------- items
-
-  emergeItem(block, sprite, onReady) {
-    sprite.setDepth(-1);
-    sprite.body.enable = false;
-    this.tweens.add({
-      targets: sprite,
-      y: block.y - TILE,
-      duration: 450,
-      ease: 'Sine.easeOut',
-      onComplete: () => {
-        sprite.setDepth(1);
-        sprite.body.enable = true;
-        onReady();
-      },
-    });
-  }
-
-  /** Mushroom-style item: slides, bounces off walls, falls off edges. */
-  spawnWalkingItem(block, kind, texture, frame) {
-    const item = this.items.create(block.x, block.y, texture, frame);
-    item.setData('kind', kind);
-    item.body.setSize(14, 14);
-    item.body.setOffset(2, 4);
-    this.emergeItem(block, item, () => {
-      item.setCollideWorldBounds(true);
-      item.setBounce(1, 0);
-      item.setVelocityX(60);
-    });
-  }
-
-  spawnFireGem(block) {
-    const gem = this.items.create(block.x, block.y, 'gem-fire');
-    gem.setData('kind', 'fireGem');
-    gem.body.setAllowGravity(false);
-    this.emergeItem(block, gem, () => {});
-  }
-
-  spawnStar(block) {
-    const star = this.items.create(block.x, block.y, 'gem-star');
-    star.setData('kind', 'star');
-    star.body.setSize(12, 12);
-    star.body.setOffset(3, 3);
-    this.emergeItem(block, star, () => {
-      star.setCollideWorldBounds(true);
-      star.setBounce(1, 0);
-      star.setVelocity(110, -240);
-    });
-    const tints = [0xffffff, 0xffe066, 0x66e0ff, 0xff8de1, 0x9dff8d];
-    const shimmer = this.time.addEvent({
-      delay: 120,
-      repeat: -1,
-      callback: () => {
-        if (!star.active) {
-          shimmer.remove();
-          return;
-        }
-        star.setTint(tints[Math.floor(this.time.now / 120) % tints.length]);
-      },
-    });
-  }
-
-  onItemBounce(a, b) {
-    // argument order is not guaranteed in group-vs-group collisions
-    const item = a.getData && a.getData('kind') ? a : b;
-    if (item.getData('kind') === 'star' && item.body.blocked.down) {
-      item.setVelocityY(-330);
-    }
-  }
-
-  onCollectItem(player, item) {
-    if (!item.body.enable) return; // still emerging
-    const kind = item.getData('kind');
-    item.destroy();
-
-    this.sparkle(item.x, item.y, kind === 'oneup' ? 0x9dff8d : 0xffe066);
-
-    if (kind === 'mushroom') {
-      sfx.play('powerup');
-      this.addScore(SCORE_POWERUP, player.x, player.y - 24);
-      if (player.powerState === 'SMALL') player.grow();
-    } else if (kind === 'fireGem') {
-      sfx.play('powerup');
-      this.addScore(SCORE_POWERUP, player.x, player.y - 24);
-      player.upgradeToFire();
-    } else if (kind === 'star') {
-      sfx.play('powerup');
-      this.addScore(SCORE_POWERUP, player.x, player.y - 24);
-      player.startStar();
-    } else if (kind === 'oneup') {
-      sfx.play('oneup');
-      this.registry.values.lives += 1;
-      const popup = this.add
-        .text(player.x, player.y - 24, '1-UP!', {
-          fontFamily: 'monospace',
-          fontSize: '14px',
-          fontStyle: 'bold',
-          color: '#9dff8d',
-        })
-        .setOrigin(0.5)
-        .setStroke('#000000', 3)
-        .setDepth(10);
-      this.tweens.add({
-        targets: popup,
-        y: popup.y - 32,
-        alpha: 0,
-        duration: 900,
-        onComplete: () => popup.destroy(),
-      });
-    }
-  }
-
-  // ---------------------------------------------------------- fireballs
-
-  shootFireball() {
-    const active = this.fireballs.getChildren().filter((f) => f.active).length;
-    if (active >= MAX_FIREBALLS) return;
-
-    sfx.play('fireball');
-    const dir = this.player.flipX ? -1 : 1;
-    const ball = this.fireballs.create(this.player.x + dir * 14, this.player.y, 'fireball');
-    ball.setDepth(2);
-    ball.setCircle(5);
-    ball.setVelocity(dir * FIREBALL_SPEED, 80);
-    ball.body.setAngularVelocity(dir * 600);
-
-    this.time.delayedCall(FIREBALL_LIFETIME, () => {
-      if (ball.active) this.poof(ball);
-    });
-  }
-
-  onFireballBounce(a, b) {
-    const ball = a.texture && a.texture.key === 'fireball' ? a : b;
-    if (ball.body.blocked.left || ball.body.blocked.right) {
-      this.poof(ball);
-    } else if (ball.body.blocked.down) {
-      ball.setVelocityY(FIREBALL_BOUNCE_VY);
-    }
-  }
-
-  onFireballHitsEnemy(a, b) {
-    const enemy = a instanceof Walker ? a : b;
-    const ball = enemy === a ? b : a;
-    if (enemy.isSquashed || !ball.body.enable) return;
-    sfx.play('stomp');
-    this.poof(ball);
-    enemy.knockAway(ball.x);
-    this.addScore(SCORE_STOMP, enemy.x, enemy.y - 16);
-  }
-
-  poof(obj) {
-    obj.body.enable = false;
-    this.tweens.add({
-      targets: obj,
-      scale: obj.scale * 1.8,
-      alpha: 0,
-      duration: 120,
-      onComplete: () => obj.destroy(),
-    });
-  }
-
-  // ------------------------------------------------------ player contact
-
-  /** Remember that a grid entity is gone (survives pipe trips). */
-  consume(key) {
-    if (key) this.consumed.add(key);
+  bumpCoinCount() {
+    this.registry.values.coins += 1;
   }
 
   onCollectCoin(player, coin) {
     coin.body.enable = false;
-    this.consume(coin.getData('key'));
     sfx.play('coin');
     this.sparkle(coin.x, coin.y);
     this.addScore(SCORE_COIN, coin.x, coin.y);
-    this.registry.values.coins += 1;
+    this.bumpCoinCount();
     this.tweens.add({
       targets: coin,
       y: coin.y - 24,
@@ -707,15 +572,29 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  onPlayerEnemyContact(player, enemy) {
-    if (player.isDead || enemy.isSquashed || this.autoPhase) return;
+  onCollectEmblem(player, emblem) {
+    if (!emblem.active) return;
+    emblem.body.enable = false;
+    this.collected += 1;
+    this.registry.set('emblems', this.collected);
+    sfx.play('emblem');
+    this.sparkle(emblem.x, emblem.y, 0xffe066);
+    this.addScore(SCORE_COLLECTIBLE, emblem.x, emblem.y);
+    this.tweens.add({
+      targets: emblem,
+      y: emblem.y - 22,
+      scale: 1.5,
+      alpha: 0,
+      duration: 260,
+      ease: 'Cubic.easeOut',
+      onComplete: () => emblem.destroy(),
+    });
+  }
 
-    if (player.starActive) {
-      sfx.play('stomp');
-      enemy.knockAway(player.x);
-      this.addScore(SCORE_STAR_KILL, enemy.x, enemy.y - 16);
-      return;
-    }
+  // ------------------------------------------------------ player contact
+
+  onPlayerEnemyContact(player, enemy) {
+    if (player.isDead || enemy.isSquashed || this.worldFrozen || this.finishing) return;
 
     const stomping =
       player.body.velocity.y > 0 &&
@@ -728,11 +607,10 @@ export default class GameScene extends Phaser.Scene {
       player.body.setVelocityY(STOMP_BOUNCE);
       this.addScore(SCORE_STOMP, enemy.x, enemy.y - 16);
     } else {
-      this.hurtPlayer();
+      this.killPlayer();
     }
   }
 
-  /** Little burst of glittery squares (coin and item pick-ups). */
   sparkle(x, y, tint = 0xffe066) {
     const particles = this.add
       .particles(x, y, 'spark', {
@@ -745,34 +623,6 @@ export default class GameScene extends Phaser.Scene {
       .setDepth(5);
     particles.explode(8);
     this.time.delayedCall(500, () => particles.destroy());
-  }
-
-  hurtPlayer() {
-    const p = this.player;
-    if (p.isDead || p.invulnerable || p.isTransforming || p.starActive || this.autoPhase) return;
-
-    if (p.powerState === 'SMALL') {
-      this.killPlayer();
-    } else {
-      sfx.play('hurt');
-      p.downgrade();
-    }
-  }
-
-  killPlayer() {
-    if (this.player.isDead) return;
-    sfx.stopMusic();
-    sfx.play('death');
-    this.player.die();
-    this.cameras.main.stopFollow();
-    this.time.delayedCall(1800, () => {
-      const lives = (this.registry.get('lives') ?? 3) - 1;
-      this.registry.set('lives', lives);
-      // dying in a bonus room restarts the level it belongs to
-      const levelId = this.returnTo?.levelId ?? this.levelId;
-      if (lives > 0) this.scene.start('IntroScene', { levelId });
-      else this.scene.start('GameOverScene');
-    });
   }
 
   addScore(amount, x, y) {
@@ -796,107 +646,225 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  // -------------------------------------------- flag & level transitions
+  // ---------------------------------------------------- freeze / lock
 
-  startFlagSequence(player, zone) {
-    if (this.autoPhase || player.isDead) return;
-    this.autoPhase = 'flag';
-    sfx.stopMusic();
-    sfx.play('flag');
-
-    const { x, topY, bottomY } = this.flagInfo;
-
-    // higher grab = more points: 100 (bottom) … 5000 (top)
-    const ratio = Phaser.Math.Clamp((bottomY - player.body.bottom) / (bottomY - topY), 0, 1);
-    const points = 100 + Math.round(ratio * 49) * 100;
-    this.addScore(points, x, topY - 10);
-
-    player.body.enable = false;
-    player.setFlipX(true);
-    player.x = x + 10;
-    player.anims.play(`${player.animPrefix}-jump`);
-
-    // flag + player slide down the pole together
-    this.tweens.add({ targets: this.flagSprite, y: bottomY - TILE, duration: 700 });
-    this.tweens.add({
-      targets: player,
-      y: bottomY - 12 * player.scale,
-      duration: 400 + ratio * 500,
-      onComplete: () => {
-        player.body.enable = true;
-        player.body.reset(player.x, player.y);
-        player.setFlipX(false);
-        this.autoPhase = 'walk'; // update() walks them to the door
-      },
-    });
+  lock() {
+    if (this.worldFrozen) return;
+    this.worldFrozen = true;
+    this.player.setFrozen(true);
+    if (this.player.body) this.player.body.setVelocity(0, 0);
+    music.duck(true);
+    setOnStackEmpty(() => this.unlock());
   }
 
-  finishLevel() {
-    this.autoPhase = 'done';
-    this.player.body.setVelocityX(0);
+  unlock() {
+    if (!this.worldFrozen) return;
+    this.worldFrozen = false;
+    if (this.player && this.player.active) this.player.setFrozen(false);
+    music.duck(false);
+    setOnStackEmpty(null);
+  }
 
-    // remaining time becomes points (50 per second, like the classics)
-    const t = this.registry.get('time') ?? 0;
-    if (t > 0) {
-      this.registry.set('time', 0);
-      this.addScore(t * 50, this.player.x, this.player.y - 40);
+  // ------------------------------------------------------------- álbum
+
+  async openAlbum() {
+    if (this.worldFrozen || this.finishing || this.player.isDead) return;
+    this.lock();
+
+    const memories = [];
+    for (const level of CAMPAIGN_LEVELS) {
+      const memory = MEMORIES[level.memory];
+      const acknowledged = isMemoryConfirmed(level.memory);
+      let photoUrl = null;
+      if (acknowledged) {
+        const r = await resolvePhoto(memory.photo);
+        if (r.ok) photoUrl = r.url;
+      }
+      memories.push({ ...memory, emblem: level.emblem, acknowledged, photoUrl });
     }
 
-    this.tweens.add({ targets: this.player, alpha: 0, duration: 250 }); // into the door
-    this.cameras.main.fadeOut(700);
-    this.cameras.main.once('camerafadeoutcomplete', () => {
-      if (this.level.next === 'end') {
-        this.scene.start('EndScene');
-      } else {
-        this.scene.start('IntroScene', {
-          levelId: this.level.next,
-          powerState: this.player.powerState,
-        });
-      }
+    // Recuerdos sorpresa ya encontrados (no revelamos los que faltan: spoiler).
+    for (const bonus of Object.values(BONUS_MEMORIES)) {
+      if (!isBonusFound(bonus.id)) continue;
+      let photoUrl = null;
+      const r = await resolvePhoto(bonus.photo);
+      if (r.ok) photoUrl = r.url;
+      memories.push({
+        ...bonus,
+        emblem: null,
+        emoji: bonus.emoji || '🎁',
+        acknowledged: true,
+        photoUrl,
+      });
+    }
+
+    if (!this.scene.isActive()) return;
+    showAlbum({
+      memories,
+      onOpenMemory: (entry) => openPhotoViewer(entry, entry.photoUrl),
     });
   }
 
-  enterPipe(target) {
-    this.autoPhase = 'pipe';
-    sfx.play('pipe');
-    const p = this.player;
-    p.body.enable = false;
-    p.body.setVelocity(0, 0);
-    this.tweens.add({
-      targets: p,
-      y: p.y + 26,
-      duration: 450,
-      ease: 'Sine.easeIn',
+  // ------------------------------------------------------------- audio
+
+  toggleMute() {
+    const pref = getAudioPreference();
+    const muted = !pref.muted;
+    setAudioPreference(muted);
+    sfx.setMuted(muted);
+    music.setMuted(muted);
+    return muted;
+  }
+
+  // ------------------------------------------------------------- chests
+
+  onChestZone(player, zone) {
+    if (this.worldFrozen || this.finishing || this.player.isDead) return;
+    const chest = this.chests[zone.getData('chestIndex')];
+    if (!chest || chest.opened) return;
+    this.openChest(chest);
+  }
+
+  async openChest(chest) {
+    chest.opened = true;
+    this.lock();
+
+    chest.sprite.play('chest-open');
+    sfx.play('chest');
+    this.sparkle(chest.sprite.x, chest.sprite.y - 6, 0xffe066);
+
+    if (chest.kind === 'bonus') {
+      const bonus = BONUS_MEMORIES[chest.bonusId];
+      const bonusResult = await showMemory({
+        memory: bonus,
+        getPhoto: () => resolvePhoto(bonus.photo),
+        onExitToMenu: () => {
+          this.scene.start('TitleScene');
+        },
+      });
+      if (!this.scene.isActive()) return;
+      if (bonusResult === 'confirmed') {
+        markBonusFound(chest.bonusId);
+        chest.sprite.setFrame(1);
+        if (chest.marker) chest.marker.destroy();
+        this.player.celebrate(1200);
+        sfx.play('emblem');
+        toast(`${bonus.emoji || '🎁'} ¡Sorpresa guardada en tu álbum!`);
+      } else {
+        chest.sprite.setFrame(0);
+        chest.opened = false;
+      }
+      this.unlock();
+      return;
+    }
+
+    const memory = MEMORIES[chest.memoryId];
+    const result = await showMemory({
+      memory,
+      getPhoto: () => resolvePhoto(memory.photo),
+      onExitToMenu: () => {
+        this.scene.start('TitleScene');
+      },
     });
-    this.cameras.main.fadeOut(450);
-    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.restart(target));
+
+    if (!this.scene.isActive()) return;
+
+    if (result === 'confirmed') {
+      confirmMemory(chest.memoryId);
+      chest.sprite.setFrame(1);
+      this.openGate();
+      this.checkpoint = { col: chest.safeCol, row: chest.floorRow - 1 };
+      this.player.celebrate(1400);
+      sfx.play('emblem');
+      toast('¡Emblema conseguido! La meta se abrió.');
+    } else {
+      // Error de foto o cierre inesperado: el cofre queda disponible de nuevo.
+      chest.sprite.setFrame(0);
+      chest.opened = false;
+    }
+    this.unlock();
+  }
+
+  // ------------------------------------------------------------- gate
+
+  onGateBlock(player, solid) {
+    if (this.gate?.open || this.gateHintShown || this.worldFrozen) return;
+    this.gateHintShown = true;
+    toast('Abre el cofre del recuerdo para abrir la meta 💝');
+  }
+
+  onGateZone() {
+    this.tryFinish();
+  }
+
+  tryFinish() {
+    if (this.finishing || this.worldFrozen || this.player.isDead) return;
+    if (!this.gate?.open || !canExitLevel(getState(), this.levelId)) {
+      this.onGateBlock();
+      return;
+    }
+    this.finishing = true;
+    this.player.setFrozen(true);
+    if (this.player.body) this.player.body.setVelocity(0, 0);
+    sfx.play('flag');
+    this.cameras.main.fadeOut(700);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      if (this.level.next === 'epilogue') this.scene.start('EpilogueScene');
+      else this.scene.start('IntroScene', { levelId: this.level.next });
+    });
+  }
+
+  // ------------------------------------------------------- death & help
+
+  killPlayer() {
+    if (this.player.isDead || this.worldFrozen || this.finishing) return;
+    sfx.play('death');
+    this.player.die();
+    this.cameras.main.stopFollow();
+    this.cameras.main.fadeOut(220);
+    this.time.delayedCall(430, () => this.respawn());
+  }
+
+  respawn() {
+    this.falls += 1;
+    const col = this.checkpoint.col;
+    const row = this.checkpoint.row ?? 0;
+    const floorRow = this.findFloorRow(col, row);
+    const feetY = floorRow * TILE;
+    this.player.revive(col * TILE + TILE / 2, feetY - this.player.feetOffset);
+    this.airJumpUsed = false;
+    this.cameras.main.fadeIn(250);
+    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    this.maybeOfferHelp();
+  }
+
+  async maybeOfferHelp() {
+    if (this.helpOffered || this.falls < HELP_AFTER_FALLS) return;
+    this.helpOffered = true;
+    this.lock();
+    const answer = await showChoice({
+      title: HELP.prompt,
+      message: 'Puedo dejarte dar un saltito extra en el aire para pasar los huecos.',
+      yes: HELP.yes,
+      no: HELP.no,
+    });
+    if (!this.scene.isActive()) return;
+    if (answer === 'yes') {
+      this.assist = true;
+      toast('¡Saltito extra activado! Pulsa saltar otra vez en el aire.');
+    }
+    this.unlock();
   }
 
   // ------------------------------------------------------- timer & pause
-
-  setupTimer() {
-    // pipe travel keeps the clock running; everything else resets it
-    if (!this.keepTime) this.registry.set('time', this.level.time ?? 300);
-    this.time.addEvent({
-      delay: 1000,
-      loop: true,
-      callback: () => {
-        if (this.autoPhase || this.player.isDead) return;
-        const t = (this.registry.get('time') ?? 0) - 1;
-        this.registry.set('time', Math.max(0, t));
-        if (t <= 0) this.killPlayer(); // time up — power state doesn't save you
-      },
-    });
-  }
 
   setupPause() {
     this.input.keyboard.on('keydown-ESC', () => this.pauseGame());
     this.input.keyboard.on('keydown-P', () => this.pauseGame());
   }
 
-  /** Also called by the HUD's pause button. */
   pauseGame() {
-    if (this.autoPhase || this.player.isDead || this.scene.isPaused()) return;
+    if (this.worldFrozen || this.finishing || this.player.isDead || this.scene.isPaused()) return;
     this.scene.launch('PauseScene');
     this.scene.pause();
   }
@@ -905,90 +873,70 @@ export default class GameScene extends Phaser.Scene {
 
   setupInput() {
     this.cursors = this.input.keyboard.createCursorKeys();
-    this.keys = this.input.keyboard.addKeys('W,A,S,D,SHIFT,X');
+    this.keys = this.input.keyboard.addKeys('W,A,S,D');
     this.jumpWasHeld = false;
-    this.fireWasHeld = false;
+    this.jumpBufferMs = 0;
+    this.coyoteMs = 0;
   }
 
   // -------------------------------------------------------------- update
 
-  update() {
-    if (this.hills) {
+  update(time, delta) {
+    if (this.hills && this.cameras.main) {
       this.hills.tilePositionX = (this.cameras.main.scrollX * 0.4) / 3;
     }
 
-    if (this.player.isDead) return;
+    if (this.worldFrozen || this.finishing) {
+      this.jumpBufferMs = 0;
+      return;
+    }
+    if (this.player.isDead) {
+      this.jumpBufferMs = 0;
+      return;
+    }
 
-    // fell into a pit
-    if (this.player.y > GAME_HEIGHT + 40 && !this.autoPhase) {
+    if (this.player.y > GAME_HEIGHT + 40) {
       this.killPlayer();
       return;
     }
 
-    if (this.autoPhase === 'walk') {
-      // auto-walk to the castle door after the flag slide
-      this.player.handleInput({ left: false, right: true, jumpHeld: false, jumpPressed: false });
-      if (this.doorX === null || this.player.x >= this.doorX - 2) this.finishLevel();
-      return;
-    }
-    if (this.autoPhase) return; // pipe / flag / done — tweens are in charge
-
     const left = this.cursors.left.isDown || this.keys.A.isDown || touchState.left;
     const right = this.cursors.right.isDown || this.keys.D.isDown || touchState.right;
-    const down = this.cursors.down.isDown || this.keys.S.isDown || touchState.down;
     const jumpHeld =
       this.cursors.up.isDown ||
       this.cursors.space.isDown ||
       this.keys.W.isDown ||
       touchState.jump;
-    const fireHeld = this.keys.SHIFT.isDown || this.keys.X.isDown || touchState.fire;
 
-    const jumpPressed = jumpHeld && !this.jumpWasHeld;
-    const firePressed = fireHeld && !this.fireWasHeld;
+    // Borde de la pulsación (teclado o botón táctil).
+    const jumpEdge = jumpHeld && !this.jumpWasHeld;
     this.jumpWasHeld = jumpHeld;
-    this.fireWasHeld = fireHeld;
 
-    this.player.handleInput({ left, right, jumpHeld, jumpPressed });
+    // Búfer: recuerda un salto pulsado un poco antes de tocar el suelo.
+    if (jumpEdge) this.jumpBufferMs = JUMP_BUFFER_MS;
+    else this.jumpBufferMs = Math.max(0, this.jumpBufferMs - delta);
 
-    if (firePressed && this.player.powerState === 'FIRE' && !this.player.isTransforming) {
-      this.shootFireball();
+    const onGround = this.player.body.onFloor();
+
+    // Coyote: se puede saltar poco después de haber dejado el suelo.
+    this.coyoteMs = onGround ? COYOTE_MS : Math.max(0, this.coyoteMs - delta);
+
+    const canJump = onGround || this.coyoteMs > 0;
+    if (this.jumpBufferMs > 0 && canJump && !this.player.isFrozen) {
+      this.jumpBufferMs = 0;
+      this.coyoteMs = 0;
+      this.player.doJump();
     }
 
-    // standing on a secret pipe + Down = travel
-    if (down && this.pipeUnder && this.player.body.onFloor()) {
-      // level state travels with us, so the world is as we left it
-      const consumed = { ...this.consumedAll, [this.levelId]: [...this.consumed] };
-      const target = this.level.secret
-        ? {
-            levelId: this.level.secret.room,
-            powerState: this.player.powerState,
-            returnTo: { levelId: this.levelId, spawnCol: this.level.secret.exitCol },
-            keepTime: true,
-            consumed,
-          }
-        : {
-            // exit pipe of a bonus room — back to the caller (with a
-            // safe fallback if the return info was somehow lost)
-            levelId: this.returnTo?.levelId ?? 'level1',
-            spawnCol: this.returnTo?.spawnCol ?? null,
-            powerState: this.player.powerState,
-            exitViaPipe: true,
-            keepTime: true,
-            consumed,
-          };
-      this.enterPipe(target);
-    }
-    this.pipeUnder = null; // refreshed by the overlap every frame
+    this.player.handleInput({ left, right, jumpHeld });
 
-    // tidy up items and enemies that fell into pits
-    this.items.getChildren().forEach((item) => {
-      if (item.y > GAME_HEIGHT + 60) item.destroy();
-    });
-    this.enemies.getChildren().forEach((enemy) => {
-      if (enemy.y > GAME_HEIGHT + 60) {
-        this.consume(enemy.gridKey); // gone for good, like a kill
-        enemy.destroy();
-      }
-    });
+    // "Patita" extra: a mid-air jump once the player accepts help.
+    if (onGround) this.airJumpUsed = false;
+    if (this.assist && jumpEdge && !onGround && !this.airJumpUsed && !this.player.isFrozen) {
+      this.airJumpUsed = true;
+      this.player.body.setVelocityY(ASSIST_JUMP_VELOCITY);
+      this.player.squashStretch(0.85, 1.15);
+      sfx.play('jump');
+    }
   }
 }

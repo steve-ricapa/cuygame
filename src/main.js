@@ -6,9 +6,10 @@ import IntroScene from './scenes/IntroScene.js';
 import GameScene from './scenes/GameScene.js';
 import HUDScene from './scenes/HUDScene.js';
 import PauseScene from './scenes/PauseScene.js';
-import GameOverScene from './scenes/GameOverScene.js';
-import EndScene from './scenes/EndScene.js';
+import EpilogueScene from './scenes/EpilogueScene.js';
 import { setupTouchControls, setupControlsSwap } from './input/TouchControls.js';
+import { music } from './audio/music.js';
+import { sfx } from './audio/sfx.js';
 
 // Show/wire the on-screen buttons before the game boots, so the
 // layout (game on top, controls below) is settled when Phaser measures
@@ -22,10 +23,13 @@ setupControlsSwap();
 // NOTE: keep in sync with the #game-container aspect-ratio in index.html.
 const BASE_WIDTH = 800;
 const PORTRAIT_WIDTH = 540;
+const NARROW_PORTRAIT_WIDTH = 480;
 const HEIGHT = 450;
 const portraitQuery = window.matchMedia('(orientation: portrait)');
 const logicalWidth = () =>
-  isTouchDevice() && portraitQuery.matches ? PORTRAIT_WIDTH : BASE_WIDTH;
+  isTouchDevice() && portraitQuery.matches
+    ? (window.innerWidth <= 360 ? NARROW_PORTRAIT_WIDTH : PORTRAIT_WIDTH)
+    : BASE_WIDTH;
 
 const config = {
   type: Phaser.AUTO,
@@ -53,8 +57,7 @@ const config = {
     GameScene,
     HUDScene,
     PauseScene,
-    GameOverScene,
-    EndScene,
+    EpilogueScene,
   ],
 };
 
@@ -68,4 +71,8 @@ portraitQuery.addEventListener('change', () => {
 
 if (import.meta.env.DEV) {
   window.__game = game; // debug handle for tools/probe.mjs (dev only)
+  // Referencias al audio real de la app (evita importar el módulo aparte en las
+  // sondas, que puede resolver a otra instancia).
+  game.__music = music;
+  game.__sfx = sfx;
 }
