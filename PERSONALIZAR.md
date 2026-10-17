@@ -51,9 +51,11 @@ emoji; si no, el cofre muestra «Foto pendiente» y todo lo demás sigue igual.
 - No dejes dos variantes del mismo nombre (`01-nina.jpg` **y** `01-nina.png`):
   el verificador lo marcará como error.
 
-> ⚠️ **Privacidad:** las fotos, la música, la carta y la dedicatoria **nunca se
-> suben al repositorio**. Están ignoradas por `.gitignore` (`public/personal/`).
-> Quedan solo en tu copia y en lo que decidas publicar o empaquetar.
+> ⚠️ **Privacidad y permisos:** Steve autorizó expresamente publicar las cinco
+> fotos y los cinco MP3 de esta versión en el repositorio público y en Vercel.
+> Cualquiera podrá descargarlos y permanecerán en el historial Git incluso si
+> más tarde se borran del árbol actual. La carta y la dedicatoria siguen
+> excluidas por `.gitignore` hasta que decidas otra cosa.
 
 ---
 
@@ -213,5 +215,7 @@ carpeta compilada, ya que Vite los copia desde `public/`.
 
 - No inventes datos sobre ella (fechas de relación, sueños, edad): el contenido
   ya está escrito para ser cálido **sin afirmar cosas** que quizá no sean ciertas.
-- No subas fotos, música comercial, la carta ni el ZIP a un repositorio público.
+- No subas nuevas fotos, nuevas pistas comerciales, la carta ni el ZIP sin
+  permiso para hacerlos públicos. Las cinco fotos y cinco pistas actuales fueron
+  autorizadas expresamente para esta versión.
 - No hace falta ninguna cuenta, backend, compra ni IA en tiempo de ejecución.

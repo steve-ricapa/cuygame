@@ -16,14 +16,27 @@ npm-debug.log*
 # Generated tool output (contact sheets, level screenshots, temp scripts)
 tools/_*
 
-# ---- Archivos personales (NUNCA se suben al repositorio) --------------------
-# Fotos, música comercial, la carta y la dedicatoria son privados.
+# ---- Archivos personales ----------------------------------------------------
+# Steve autorizó publicar las 5 fotos y los 5 MP3 en este repositorio público.
+# Otros archivos de estas carpetas permanecen excluidos para no publicarlos
+# por accidente al añadir contenido nuevo.
 public/personal/fotos/*
+!public/personal/fotos/.gitkeep
+!public/personal/fotos/01-nina.jpeg
+!public/personal/fotos/02-actual.jpeg
+!public/personal/fotos/03-juntos.jpeg
+!public/personal/fotos/actual-guapa1.jpeg
+!public/personal/fotos/cuy-gracioso gritando.jpeg
 public/personal/musica/*
+!public/personal/musica/.gitkeep
+!public/personal/musica/01-intro-every-breath-you-take.mp3
+!public/personal/musica/02-nivel-1-woman.mp3
+!public/personal/musica/03-nivel-2-waiting-for-a-girl-like-you.mp3
+!public/personal/musica/04-nivel-3-the-reason.mp3
+!public/personal/musica/The Beatles - Here, There and Everywhere.mp3
+# La carta y la dedicatoria (si se añaden más tarde) siguen siendo privadas.
 public/personal/carta.txt
 public/personal/dedicatoria.mp3
-!public/personal/fotos/.gitkeep
-!public/personal/musica/.gitkeep
 
 # Bandeja local para packs comprados (p. ej. Guinea_Pigs_Asset.zip)
 asset-inbox/*

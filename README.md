@@ -1,8 +1,9 @@
 # Cuy Adventure — Misión Cumpleaños 🐹
 
 Una aventura de cumpleaños de tres niveles, hecha con Phaser 3 y Vite a partir
-de [AstroHop](https://github.com/nunoamorim99/AstroHop). El contenido personal
-se mantiene fuera de Git; consulta [PERSONALIZAR.md](PERSONALIZAR.md).
+de [AstroHop](https://github.com/nunoamorim99/AstroHop). Las fotos y los MP3
+autorizados forman parte de este repositorio público; consulta
+[PERSONALIZAR.md](PERSONALIZAR.md) para cambiar el contenido.
 
 ## Proyecto de origen
 
@@ -30,10 +31,12 @@ Built with original assets (not Nintendo IP), starting from Kenney.nl's CC0 pixe
 - Controles para teclado y pantalla táctil, en vertical y horizontal; sin
   pantalla completa ni orientación obligatorias.
 - Música personal opcional (si falta, se usa música sintetizada original).
-- Las fotos y los MP3 **no están en Git**: un despliegue desde este repositorio
-  muestra «Foto pendiente» y usa la música sintetizada. Para entregar el regalo
-  completo, consulta [PERSONALIZAR.md](PERSONALIZAR.md) y empaqueta una copia
-  privada de `dist/` con los archivos autorizados.
+- Las cinco fotos y los cinco MP3 autorizados están en
+  `public/personal/` y Vite los copia a `dist/personal/`. Vercel puede construir
+  desde `main` con preset **Vite** y directorio de salida **`dist`**. Al ser un
+  despliegue público, cualquiera con el enlace puede descargar esos medios.
+- La carta y la dedicatoria de voz siguen fuera de Git; el juego usa la carta
+  de respaldo si no existe `carta.txt`.
 
 El código y créditos del proyecto original permanecen en el historial y en la
 sección de licencias de abajo.

@@ -63,25 +63,27 @@ npm run art:cuy
 ## Audio — sintetizado en vivo (original, MIT)
 
 - **Archivos:** `src/audio/sfx.js` (efectos) y `src/audio/music.js` (música).
-- Todo se genera con la **Web Audio API**; el repositorio **no** incluye audio.
-  Si falta un MP3 personal, suena la pista sintetizada original.
-- Licencia: MIT, igual que el código.
+- Los efectos y las pistas de respaldo se generan con la **Web Audio API**.
+  Si falta un MP3, suena la pista sintetizada original.
+- Licencia MIT **solo para el código y el audio sintetizado**; no para los MP3
+  comerciales publicados por Steve.
 
 ---
 
-## Recursos personales de Steve (NO distribuidos)
+## Fotos y música personal aportadas por Steve
 
-Estos archivos los añade Steve localmente y **no** forman parte del repositorio
-(ver `.gitignore` y `PERSONALIZAR.md`):
+Steve autorizó incluir las cinco fotos y los cinco MP3 de esta versión en el
+repositorio público y Vercel. No se ofrecen bajo la licencia MIT del código:
 
-- `public/personal/fotos/01-nina|02-actual|03-juntos.(jpg|png|webp)`
-- `public/personal/musica/*.mp3`
-- `public/personal/carta.txt`
-- `public/personal/dedicatoria.mp3`
+- Fotos: `01-nina.jpeg`, `02-actual.jpeg`, `03-juntos.jpeg`,
+  `actual-guapa1.jpeg`, `cuy-gracioso gritando.jpeg` en `public/personal/fotos/`.
+- Música: las cinco pistas `.mp3` de `public/personal/musica/`.
+- No incluidos: `public/personal/carta.txt`, `public/personal/dedicatoria.mp3`
+  y archivos de `asset-inbox/`.
 
-**Responsabilidad de quien regala:** usar solo música sobre la que tenga
-derechos (comprada o con licencia), y no publicar fotos ni datos personales en
-un sitio accesible por terceros.
+**Responsabilidad de quien publica:** contar con derechos de distribución de
+las canciones y consentimiento para publicar las fotos. Los archivos quedan
+descargables por cualquiera con acceso al repositorio o al sitio.
 
 ---
 

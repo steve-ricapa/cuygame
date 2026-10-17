@@ -125,10 +125,12 @@ verificación visual/datos reales · ⬜ pendiente.
   panel con su emoji y la foto resuelta (incluido el nombre con espacio).
 
 ### ✅ F9 — Privacidad y empaquetado
-- `.gitignore` excluye `public/personal/fotos/*`, `public/personal/musica/*`,
-  `public/personal/carta.txt`, `public/personal/dedicatoria.mp3` y `asset-inbox/*`
-  (con excepciones `!.gitkeep`).
-- Carpetas con `.gitkeep` listas para que Steve solo arrastre sus archivos.
+- Steve autorizó incluir las cinco fotos y los cinco MP3 en el repositorio
+  público y en el despliegue Vercel. Vite los copia de `public/personal/` a
+  `dist/personal/`; sus URLs serán públicas.
+- `.gitignore` mantiene fuera `public/personal/carta.txt`,
+  `public/personal/dedicatoria.mp3` y `asset-inbox/*` (con excepción de
+  `.gitkeep` en la bandeja local).
 
 ### ⚠️ F10 — Contenido real
 - Steve ya cargó las **5 fotos**: las 3 de los recuerdos
